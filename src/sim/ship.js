@@ -1,75 +1,183 @@
-export function createShip(x, y) {
-  return {
-    x,
-    y,
+import { Entity } from './entity.js'
+import { Vector2 } from './vector.js'
+import { Bullet } from './bullet.js'
+import { createHoming } from './homing.js'
 
-    previousX: x,
-    previousY: y,
+export class Ship extends Entity {
+  #hp = 100
 
-    vx: 0,
-    vy: 0,
+  constructor(x, y) {
+    super({
+      pos: new Vector2(x, y),
+      vel: new Vector2(0, 0),
+      angle: 0,
+      radius: 15,
+      kind: 'ship',
+    })
 
-    angle: 0,
-    previousAngle: 0,
-  };
-}
+    this.previousPosition = this.pos
 
-export function integrate(ship, input, dt) {
-  const acceleration = 500;
-  const rotationSpeed = 3;
+    this.spawnPosition = new Vector2(x, y)
 
-  const maxSpeed = 500;
-  const braking = 350;
-  const reverseAcceleration = 250;
+    this.acceleration = 280
+    this.rotationSpeed = 2.5
+    this.maxSpeed = 280
+    this.braking = 450
+    this.reverseAcceleration = 120
 
-  // Запам'ятовуємо попередній стан
-  // перед зміною фізики
-  ship.previousX = ship.x;
-  ship.previousY = ship.y;
-  ship.previousAngle = ship.angle;
-
-  // Поворот вліво
-  if (input.isDown("ArrowLeft")) {
-    ship.angle -= rotationSpeed * dt;
+    this.damageCooldown = 0
   }
 
-  // Поворот вправо
-  if (input.isDown("ArrowRight")) {
-    ship.angle += rotationSpeed * dt;
+  get hp() {
+    return this.#hp
   }
 
-  // Рух вперед
-  if (input.isDown("ArrowUp")) {
-    ship.vx += Math.cos(ship.angle) * acceleration * dt;
-    ship.vy += Math.sin(ship.angle) * acceleration * dt;
-  }
+  takeDamage(amount) {
+    if (this.damageCooldown > 0) {
+      return
+    }
 
-  // Гальмування / рух назад
-  if (input.isDown("ArrowDown")) {
-    const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+    this.#hp -= amount
 
-    if (speed > 1) {
-      const newSpeed = Math.max(0, speed - braking * dt);
+    this.damageCooldown = 0.5
 
-      if (speed > 0) {
-        ship.vx *= newSpeed / speed;
-        ship.vy *= newSpeed / speed;
-      }
-    } else {
-      ship.vx -= Math.cos(ship.angle) * reverseAcceleration * dt;
-      ship.vy -= Math.sin(ship.angle) * reverseAcceleration * dt;
+    if (this.#hp <= 0) {
+      this.#hp = 0
+      this.alive = false
     }
   }
 
-  // Обмеження максимальної швидкості
-  const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-
-  if (speed > maxSpeed) {
-    ship.vx = (ship.vx / speed) * maxSpeed;
-    ship.vy = (ship.vy / speed) * maxSpeed;
+  heal(amount) {
+    this.#hp = Math.min(
+      100,
+      this.#hp + amount
+    )
   }
 
-  // Переміщення
-  ship.x += ship.vx * dt;
-  ship.y += ship.vy * dt;
+  resetAfterCollision() {
+    this.pos = new Vector2(
+      this.spawnPosition.x,
+      this.spawnPosition.y
+    )
+
+    this.previousPosition = this.pos
+    this.vel = new Vector2(0, 0)
+  }
+
+  update(dt, input) {
+    this.previousPosition = this.pos
+
+    if (this.damageCooldown > 0) {
+      this.damageCooldown -= dt
+    }
+
+    if (input.isDown('ArrowLeft')) {
+      this.angle -=
+        this.rotationSpeed * dt
+    }
+
+    if (input.isDown('ArrowRight')) {
+      this.angle +=
+        this.rotationSpeed * dt
+    }
+
+    if (input.isDown('ArrowUp')) {
+      const direction =
+        Vector2.fromAngle(this.angle)
+
+      this.vel = this.vel.add(
+        direction.scale(
+          this.acceleration * dt
+        )
+      )
+    }
+
+    if (input.isDown('ArrowDown')) {
+      const speed = this.vel.length()
+
+      if (speed > 1) {
+        const newSpeed =
+          Math.max(
+            0,
+            speed - this.braking * dt
+          )
+
+        this.vel =
+          this.vel
+            .normalize()
+            .scale(newSpeed)
+      } else {
+        const direction =
+          Vector2.fromAngle(this.angle)
+
+        this.vel =
+          this.vel.sub(
+            direction.scale(
+              this.reverseAcceleration * dt
+            )
+          )
+      }
+    }
+
+    const speed = this.vel.length()
+
+    if (speed > this.maxSpeed) {
+      this.vel =
+        this.vel
+          .normalize()
+          .scale(this.maxSpeed)
+    }
+
+    this.pos = this.pos.add(
+      this.vel.scale(dt)
+    )
+  }
+
+  fire(world) {
+    const direction =
+      Vector2.fromAngle(this.angle)
+
+    const bulletPosition =
+      this.pos.add(
+        direction.scale(
+          this.radius + 5
+        )
+      )
+
+    const bullet = new Bullet(
+      bulletPosition,
+      this.angle,
+      this.vel
+    )
+
+    world.spawn(bullet)
+
+    return bullet
+  }
+
+  fireHoming(world, target) {
+    const direction =
+      Vector2.fromAngle(this.angle)
+
+    const bulletPosition =
+      this.pos.add(
+        direction.scale(
+          this.radius + 5
+        )
+      )
+
+    const homing =
+      createHoming(target)
+
+    const bullet = new Bullet(
+      bulletPosition,
+      this.angle,
+      this.vel,
+      homing
+    )
+
+    world.spawn(bullet)
+
+    return bullet
+  }
 }
