@@ -15,19 +15,13 @@ Multiplayer Game — Lab 01
 - Prettier
 - `requestAnimationFrame`
 - ES Modules
----
+
 Запуск проєкту
 
 Встановити залежності:
 
 ```bash
 npm install
-
-Запустити сервер розробки:
-npm run dev
-
-Перевірити код за допомогою ESLint:
-npm run lint
 
            Структура проєкту
 src/
