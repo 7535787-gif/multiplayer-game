@@ -868,6 +868,13 @@ Homing є поведінкою, а не окремим видом сутност
 
 *Помилка 404 під час завантаження спрайта*
 
+"sprites": {
+    "ship": {
+      "url": "/assets/missing-sprite.svg",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 4
+
 ![Помилка 404](./screenshots/lab3/error404.jpg)
 
 *Тайм-аут мережевого запиту*
@@ -875,6 +882,17 @@ Homing є поведінкою, а не окремим видом сутност
 ![Тайм-аут мережі](./screenshots/lab3/network-timeout.jpg)
 
 *Переривання завантаження*
+
+const controller = new AbortController();
+
+fetch('/assets/manifest.json', {
+  signal: controller.signal,
+})
+  .then((response) => response.json())
+  .then(() => console.log('Завантаження завершено'))
+  .catch((error) => console.log('Результат:', error.name));
+
+controller.abort();
 
 ![Переривання завантаження](./screenshots/lab3/abort-loading.jpg)
 
