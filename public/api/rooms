@@ -1,0 +1,37 @@
+{
+  "rooms": [
+    {
+      "id": "training",
+      "name": "Training Room",
+      "description": "Тренувальна арена",
+      "arena": {
+        "width": 1000,
+        "height": 700
+      },
+      "maxPlayers": 4,
+      "players": 0
+    },
+    {
+      "id": "deep-space",
+      "name": "Deep Space",
+      "description": "Глибокий космос",
+      "arena": {
+        "width": 1200,
+        "height": 800
+      },
+      "maxPlayers": 8,
+      "players": 0
+    },
+    {
+      "id": "asteroid-field",
+      "name": "Asteroid Field",
+      "description": "Поле астероїдів",
+      "arena": {
+        "width": 800,
+        "height": 600
+      },
+      "maxPlayers": 4,
+      "players": 0
+    }
+  ]
+}

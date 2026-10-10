@@ -1,45 +1,23 @@
 import { Explosion } from './explosion.js'
+import { GAME_EVENTS, emitGameEvent } from './events.js'
 
 export function circleCircle(a, b) {
-  const dx =
-    a.pos.x - b.pos.x
+  const dx = a.pos.x - b.pos.x
+  const dy = a.pos.y - b.pos.y
+  const distanceSquared = dx * dx + dy * dy
+  const radiusSum = a.radius + b.radius
 
-  const dy =
-    a.pos.y - b.pos.y
-
-  const distanceSquared =
-    dx * dx + dy * dy
-
-  const radiusSum =
-    a.radius + b.radius
-
-  return (
-    distanceSquared <=
-    radiusSum * radiusSum
-  )
+  return distanceSquared <= radiusSum * radiusSum
 }
 
-function segmentCircle(
-  start,
-  end,
-  circle,
-  radius
-) {
-  const dx =
-    end.x - start.x
-
-  const dy =
-    end.y - start.y
-
-  const lengthSquared =
-    dx * dx + dy * dy
+function segmentCircle(start, end, circle, radius) {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const lengthSquared = dx * dx + dy * dy
 
   if (lengthSquared === 0) {
-    const distanceX =
-      start.x - circle.pos.x
-
-    const distanceY =
-      start.y - circle.pos.y
+    const distanceX = start.x - circle.pos.x
+    const distanceY = start.y - circle.pos.y
 
     return (
       distanceX * distanceX +
@@ -54,22 +32,12 @@ function segmentCircle(
       (circle.pos.y - start.y) * dy
     ) / lengthSquared
 
-  t = Math.max(
-    0,
-    Math.min(1, t)
-  )
+  t = Math.max(0, Math.min(1, t))
 
-  const closestX =
-    start.x + t * dx
-
-  const closestY =
-    start.y + t * dy
-
-  const distanceX =
-    closestX - circle.pos.x
-
-  const distanceY =
-    closestY - circle.pos.y
+  const closestX = start.x + t * dx
+  const closestY = start.y + t * dy
+  const distanceX = closestX - circle.pos.x
+  const distanceY = closestY - circle.pos.y
 
   return (
     distanceX * distanceX +
@@ -83,10 +51,7 @@ function entitiesCollide(a, b) {
     return true
   }
 
-  if (
-    a.kind === 'bullet' &&
-    a.previousPosition
-  ) {
+  if (a.kind === 'bullet' && a.previousPosition) {
     return segmentCircle(
       a.previousPosition,
       a.pos,
@@ -95,10 +60,7 @@ function entitiesCollide(a, b) {
     )
   }
 
-  if (
-    b.kind === 'bullet' &&
-    b.previousPosition
-  ) {
+  if (b.kind === 'bullet' && b.previousPosition) {
     return segmentCircle(
       b.previousPosition,
       b.pos,
@@ -110,25 +72,39 @@ function entitiesCollide(a, b) {
   return false
 }
 
+// Повідомляємо аудіомодуль про влучання.
+function notifyHit(source, target) {
+  emitGameEvent(GAME_EVENTS.HIT, {
+    sourceId: source.id,
+    sourceKind: source.kind,
+    targetId: target.id,
+    targetKind: target.kind,
+  })
+}
+
+// Створюємо вибух і повідомляємо про нього.
+function spawnExplosion(world, entity) {
+  world.spawn(new Explosion(entity.pos))
+
+  emitGameEvent(GAME_EVENTS.EXPLODED, {
+    entityId: entity.id,
+    entityKind: entity.kind,
+    x: entity.pos.x,
+    y: entity.pos.y,
+  })
+}
+
 export function resolveCollisions(world) {
   const entities = [...world]
 
-  for (
-    let i = 0;
-    i < entities.length;
-    i++
-  ) {
+  for (let i = 0; i < entities.length; i++) {
     const a = entities[i]
 
     if (!a.alive) {
       continue
     }
 
-    for (
-      let j = i + 1;
-      j < entities.length;
-      j++
-    ) {
+    for (let j = i + 1; j < entities.length; j++) {
       const b = entities[j]
 
       if (!b.alive) {
@@ -139,151 +115,125 @@ export function resolveCollisions(world) {
         continue
       }
 
-      handleCollision(
-        world,
-        a,
-        b
-      )
+      handleCollision(world, a, b)
     }
   }
 }
 
-function handleCollision(
-  world,
-  a,
-  b
-) {
-  // Куля → астероїд
+function handleCollision(world, a, b) {
+  // Куля не може пошкодити корабель, який її випустив.
   if (
     a.kind === 'bullet' &&
-    b.kind === 'asteroid'
+    b.kind === 'ship' &&
+    a.ownerId === b.id
   ) {
-    a.alive = false
+    return
+  }
 
+  if (
+    a.kind === 'ship' &&
+    b.kind === 'bullet' &&
+    b.ownerId === a.id
+  ) {
+    return
+  }
+
+  // Куля → астероїд.
+  if (a.kind === 'bullet' && b.kind === 'asteroid') {
+    a.alive = false
     b.takeDamage(a.damage)
+
+    notifyHit(a, b)
 
     if (!b.alive) {
       world.score += 100
-
-      world.spawn(
-        new Explosion(b.pos)
-      )
+      spawnExplosion(world, b)
     }
 
     return
   }
 
-  // Астероїд → куля
-  if (
-    a.kind === 'asteroid' &&
-    b.kind === 'bullet'
-  ) {
+  // Астероїд → куля.
+  if (a.kind === 'asteroid' && b.kind === 'bullet') {
     b.alive = false
-
     a.takeDamage(b.damage)
+
+    notifyHit(b, a)
 
     if (!a.alive) {
       world.score += 100
-
-      world.spawn(
-        new Explosion(a.pos)
-      )
+      spawnExplosion(world, a)
     }
 
     return
   }
 
-  // Куля → корабель
-  if (
-    a.kind === 'bullet' &&
-    b.kind === 'ship'
-  ) {
+  // Куля → корабель.
+  if (a.kind === 'bullet' && b.kind === 'ship') {
     a.alive = false
-
     b.takeDamage(a.damage)
 
+    notifyHit(a, b)
+
     if (!b.alive) {
-      world.spawn(
-        new Explosion(b.pos)
-      )
+      spawnExplosion(world, b)
     }
 
     return
   }
 
-  // Корабель → куля
-  if (
-    a.kind === 'ship' &&
-    b.kind === 'bullet'
-  ) {
+  // Корабель → куля.
+  if (a.kind === 'ship' && b.kind === 'bullet') {
     b.alive = false
-
     a.takeDamage(b.damage)
 
+    notifyHit(b, a)
+
     if (!a.alive) {
-      world.spawn(
-        new Explosion(a.pos)
-      )
+      spawnExplosion(world, a)
     }
 
     return
   }
 
-  // Корабель → астероїд
-  if (
-    a.kind === 'ship' &&
-    b.kind === 'asteroid'
-  ) {
+  // Корабель → астероїд.
+  if (a.kind === 'ship' && b.kind === 'asteroid') {
     a.takeDamage(10)
+    notifyHit(b, a)
 
     if (a.alive) {
       a.resetAfterCollision()
     } else {
-      world.spawn(
-        new Explosion(a.pos)
-      )
+      spawnExplosion(world, a)
     }
 
     return
   }
 
-  // Астероїд → корабель
-  if (
-    a.kind === 'asteroid' &&
-    b.kind === 'ship'
-  ) {
+  // Астероїд → корабель.
+  if (a.kind === 'asteroid' && b.kind === 'ship') {
     b.takeDamage(10)
+    notifyHit(a, b)
 
     if (b.alive) {
       b.resetAfterCollision()
     } else {
-      world.spawn(
-        new Explosion(b.pos)
-      )
+      spawnExplosion(world, b)
     }
 
     return
   }
 
-  // Корабель → pickup
-  if (
-    a.kind === 'ship' &&
-    b.kind === 'pickup'
-  ) {
+  // Корабель → аптечка.
+  if (a.kind === 'ship' && b.kind === 'pickup') {
     b.applyTo(a)
-
     b.alive = false
-
     return
   }
 
-  // Pickup → корабель
-  if (
-    a.kind === 'pickup' &&
-    b.kind === 'ship'
-  ) {
+  // Аптечка → корабель.
+  if (a.kind === 'pickup' && b.kind === 'ship') {
     a.applyTo(b)
-
     a.alive = false
   }
 }

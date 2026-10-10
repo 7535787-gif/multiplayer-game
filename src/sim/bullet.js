@@ -6,7 +6,8 @@ export class Bullet extends Entity {
     position,
     angle,
     inheritedVelocity,
-    homing = null
+    homing = null,
+    ownerId = null
   ) {
     const direction =
       Vector2.fromAngle(angle)
@@ -31,6 +32,7 @@ export class Bullet extends Entity {
     this.ttl = 2
     this.damage = 25
     this.homing = homing
+    this.ownerId = ownerId
   }
 
   update(dt) {

@@ -1,0 +1,131 @@
+
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lab 3 — Benchmark</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #f5f5f5;
+      color: #222;
+    }
+
+    button {
+      padding: 12px 18px;
+      cursor: pointer;
+    }
+
+    pre {
+      padding: 16px;
+      background: white;
+      border: 1px solid #ddd;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>Lab 3 — Порівняння завантаження</h1>
+  <p>Порівняння паралельного та послідовного завантаження ресурсів гри.</p>
+
+  <button id="run">Запустити вимірювання</button>
+  <pre id="result">Натисни кнопку для початку.</pre>
+
+  <script type="module">
+    import {
+      loadImage,
+      loadAudio,
+    } from '/src/assets/loader.js';
+
+    const button = document.querySelector('#run');
+    const output = document.querySelector('#result');
+
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      output.textContent = 'Завантаження...';
+
+      let audioContext;
+
+      try {
+        const response = await fetch('/assets/manifest.json', {
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          throw new Error(`Помилка manifest: HTTP ${response.status}`);
+        }
+
+        const manifest = await response.json();
+        audioContext = new AudioContext();
+
+        const tasks = [
+          ...Object.values(manifest.sprites ?? {}).map(
+            sprite => () => loadImage(sprite.url)
+          ),
+          ...Object.values(manifest.sounds ?? {}).map(
+            url => () => loadAudio(audioContext, url)
+          ),
+        ];
+
+        if (tasks.length === 0) {
+          throw new Error('У manifest немає ресурсів для завантаження.');
+        }
+
+        // Паралельне завантаження
+        const parallelStart = performance.now();
+
+        await Promise.all(tasks.map(task => task()));
+
+        const parallelTime = performance.now() - parallelStart;
+
+        // Послідовне завантаження
+        const sequentialStart = performance.now();
+
+        for (const task of tasks) {
+          await task();
+        }
+
+        const sequentialTime = performance.now() - sequentialStart;
+
+        const difference = sequentialTime - parallelTime;
+        const percent = sequentialTime > 0
+          ? (difference / sequentialTime) * 100
+          : 0;
+
+        output.textContent = [
+          `Кількість ресурсів: ${tasks.length}`,
+          '',
+          `Паралельне завантаження: ${parallelTime.toFixed(2)} мс`,
+          `Послідовне завантаження: ${sequentialTime.toFixed(2)} мс`,
+          '',
+          `Різниця: ${difference.toFixed(2)} мс`,
+          `Економія часу: ${percent.toFixed(1)}%`,
+          '',
+          'Вимірювання завершено.',
+        ].join('\n');
+
+        console.table({
+          'Паралельне, мс': parallelTime.toFixed(2),
+          'Послідовне, мс': sequentialTime.toFixed(2),
+          'Економія, %': percent.toFixed(1),
+        });
+      } catch (error) {
+        output.textContent =
+          `Помилка вимірювання: ${error.message}\n` +
+          'Перевір консоль браузера та доступність ресурсів.';
+        console.error(error);
+      } finally {
+        if (audioContext && audioContext.state !== 'closed') {
+          await audioContext.close();
+        }
+
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+
+{
+  "sprites": {
+    "ship": {
+      "url": "/assets/ship-sheet.svg",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 4
+    },
+    "bullet": {
+      "url": "/assets/bullet-sheet.svg",
+      "frameWidth": 16,
+      "frameHeight": 16,
+      "frames": 2
+    },
+    "asteroid": {
+      "url": "/assets/asteroid-sheet.svg",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "frames": 3
+    }
+  },
+  "sounds": {
+    "shoot": "/assets/shoot.wav",
+    "hit": "/assets/hit.wav",
+    "explosion": "/assets/explosion.wav"
+  },
+  "arena": {
+    "width": 1000,
+    "height": 700,
+    "name": "Deep Space"
+  }
+}

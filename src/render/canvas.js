@@ -1,27 +1,45 @@
-export function createCanvas(width = 1000, height = 700) {
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
+export function createCanvas() {
+  const canvas = document.createElement('canvas')
+  canvas.id = 'game-canvas'
 
-  function resize() {
-    const dpr = window.devicePixelRatio || 1;
+  const ctx = canvas.getContext('2d')
 
-    canvas.width = width * dpr;
-    canvas.height = height * dpr;
-
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (!ctx) {
+    throw new Error('Не вдалося створити Canvas 2D context')
   }
 
-  resize();
+  let width = Math.max(1, window.innerWidth)
+  let height = Math.max(1, window.innerHeight)
 
-  window.addEventListener("resize", resize);
+  function resize() {
+    width = Math.max(1, window.innerWidth)
+    height = Math.max(1, window.innerHeight)
+
+    const dpr = window.devicePixelRatio || 1
+
+    // Фізичний розмір Canvas з урахуванням DPR.
+    canvas.width = Math.round(width * dpr)
+    canvas.height = Math.round(height * dpr)
+
+    // Уся подальша графіка працює в логічних пікселях.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.imageSmoothingEnabled = true
+  }
+
+  window.addEventListener('resize', resize)
+  resize()
 
   return {
     canvas,
     ctx,
-    width,
-    height,
-  };
+
+    // Передаємо логічні розміри для фізики та малювання.
+    get width() {
+      return width
+    },
+
+    get height() {
+      return height
+    },
+  }
 }
