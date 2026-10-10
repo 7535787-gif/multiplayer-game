@@ -159,6 +159,8 @@ Frame time: ≈ 6.94 ms
 Зміна
 
 До функції кадру було додано навмисний блокуючий цикл, який виконується кожен 60-й кадр та займає головний потік приблизно на 100 мс.
+<img width="546" height="281" alt="image" src="https://github.com/user-attachments/assets/25cf93f3-4113-4782-9f29-049da3f55e23" />
+
 
 ![Код експерименту 1](./screenshots/experiment-1.jpg)
 
