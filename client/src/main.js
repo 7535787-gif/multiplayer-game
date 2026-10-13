@@ -14,6 +14,9 @@ import { wrapPosition } from './sim/arena.js'
 import { createAudioPlayer } from './audio.js'
 import { Lobby } from './lobby.js'
 import { LobbyUI } from './lobby-ui.js'
+import { GameSocket } from './net/socket.js'
+import { Bullet } from './sim/bullet.js'
+import { Vector2 } from './sim/vector.js'
 
 import { createCanvas } from './render/canvas.js'
 
@@ -103,6 +106,25 @@ app.innerHTML = `
       </div>
     </section>
 
+    <section class="controls-panel" id="rosterPanel">
+  <h2 class="controls-title">PLAYERS / УЧАСНИКИ</h2>
+  <ul class="controls-list" id="rosterList">
+    <li class="control-item">Очікування гравців...</li>
+  </ul>
+</section>
+
+    <section class="chat-panel" id="chatPanel" aria-label="Ігровий чат">
+      <h2 class="controls-title">ROOM CHAT / ЧАТ КІМНАТИ</h2>
+      <div class="chat-messages" id="chatMessages" aria-live="polite">
+        <p class="chat-empty">Повідомлень поки немає</p>
+      </div>
+      <form class="chat-form" id="chatForm">
+        <input class="chat-input" id="chatInput" maxlength="500"
+          autocomplete="off" placeholder="Напиши повідомлення..." aria-label="Повідомлення" />
+        <button class="chat-send" type="submit">Надіслати</button>
+      </form>
+    </section>
+
     <section class="controls-panel">
       <h2 class="controls-title">FLIGHT CONTROLS / КЕРУВАННЯ</h2>
 
@@ -175,6 +197,9 @@ let activeArena = {
 }
 
 let activePlayerName = ''
+let ownPlayerId = null
+const remotePlayers = new Map()
+let positionSendTimer = 0
 
 // Отримали список кімнат.
 lobby.addEventListener('rooms-updated', (event) => {
@@ -192,18 +217,137 @@ lobby.addEventListener('lobby-error', (event) => {
   )
 })
 
+const gameSocket = new GameSocket()
+
+gameSocket.addEventListener('message', (event) => {
+  let message
+
+  try {
+    message = JSON.parse(event.detail)
+  } catch {
+    lobbyUI.setBusy(false)
+    lobbyUI.setStatus('Сервер надіслав некоректне повідомлення', 'error')
+    return
+  }
+
+  if (message.type === 'roster') {
+    const players = Array.isArray(message.players) ? message.players : []
+    const rosterList = document.querySelector('#rosterList')
+    rosterList.replaceChildren()
+
+    const activeIds = new Set()
+    for (const player of players) {
+      activeIds.add(player.id)
+      const item = document.createElement('li')
+      item.className = 'control-item'
+      item.textContent = player.id === ownPlayerId
+        ? `${player.name} (це ти)`
+        : player.name
+      rosterList.appendChild(item)
+
+      if (player.id !== ownPlayerId && !remotePlayers.has(player.id)) {
+        remotePlayers.set(player.id, {
+          id: player.id,
+          name: player.name,
+          x: Number(player.x) || activeArena.width / 2,
+          y: Number(player.y) || activeArena.height / 2,
+          angle: Number(player.angle) || 0,
+        })
+      }
+    }
+
+    for (const id of remotePlayers.keys()) {
+      if (!activeIds.has(id)) remotePlayers.delete(id)
+    }
+
+    if (players.length === 0) {
+      const item = document.createElement('li')
+      item.className = 'control-item'
+      item.textContent = 'Очікування гравців...'
+      rosterList.appendChild(item)
+    }
+    return
+  }
+
+  if (message.type === 'state') {
+    if (message.playerId && message.playerId !== ownPlayerId &&
+        Number.isFinite(message.x) && Number.isFinite(message.y) &&
+        Number.isFinite(message.angle)) {
+      remotePlayers.set(message.playerId, {
+        id: message.playerId,
+        name: String(message.name || 'Гравець'),
+        x: message.x,
+        y: message.y,
+        angle: message.angle,
+      })
+    }
+    return
+  }
+
+  
+if (message.type === 'fire') {
+  if (
+    message.playerId !== ownPlayerId &&
+    Number.isFinite(message.x) &&
+    Number.isFinite(message.y) &&
+    Number.isFinite(message.angle) &&
+    typeof message.homing === 'boolean'
+  ) {
+    const bullet = new Bullet(
+      new Vector2(message.x, message.y),
+      message.angle,
+      new Vector2(0, 0),
+      null,
+      message.playerId
+    )
+
+    world.spawn(bullet)
+  }
+
+  return
+}
+
+
+  if (message.type === 'chat') {
+    appendChatMessage(message.name, message.text)
+    return
+  }
+
+  if (message.type === 'joined') {
+    ownPlayerId = message.playerId
+    lobbyUI.setBusy(false)
+    return
+  }
+
+  if (message.type === 'error') {
+    lobbyUI.setBusy(false)
+    lobbyUI.setStatus(message.message, 'error')
+  }
+})
+
 // Гравець натиснув кнопку приєднання.
 lobbyUI.addEventListener('join-request', (event) => {
   const { playerName, roomId } = event.detail
 
   lobbyUI.setBusy(true)
+  activePlayerName = playerName
 
-  try {
-    lobby.join(playerName, roomId)
-  } catch (error) {
-    lobbyUI.setBusy(false)
-    lobbyUI.setStatus(error.message, 'error')
-  }
+  gameSocket.send({
+    type: 'join',
+    name: playerName,
+    roomId,
+  })
+})
+
+document.querySelector('#chatForm').addEventListener('submit', (event) => {
+  event.preventDefault()
+  const chatInput = document.querySelector('#chatInput')
+  const text = chatInput.value.trim()
+  if (!text || !ownPlayerId) return
+
+  gameSocket.send({ type: 'chat', text })
+  chatInput.value = ''
+  chatInput.focus()
 })
 
 // Гравець приєднався до вибраної кімнати.
@@ -223,6 +367,8 @@ lobby.addEventListener('join', (event) => {
     assets.sounds
   )
 
+  remotePlayers.clear()
+  positionSendTimer = 0
   initializeGame(room)
 
   gameStarted = true
@@ -416,6 +562,18 @@ function findSafeSpawnPosition() {
 function update(dt) {
   world.step(dt, input)
 
+  // Передаємо позицію корабля серверу 20 разів на секунду.
+  positionSendTimer += dt
+  if (positionSendTimer >= 0.05 && ownPlayerId && ship) {
+    positionSendTimer = 0
+    gameSocket.send({
+      type: 'state',
+      x: ship.pos.x,
+      y: ship.pos.y,
+      angle: ship.angle,
+    })
+  }
+
   if (ship.alive) {
     wrapPosition(ship, activeArena.width, activeArena.height)
   }
@@ -485,6 +643,7 @@ function update(dt) {
   }
 }
 
+
 function handleKeyDown(event) {
   if (!gameStarted || !ship?.alive || event.repeat) {
     return
@@ -492,7 +651,18 @@ function handleKeyDown(event) {
 
   if (event.code === 'Space') {
     event.preventDefault()
-    ship.fire(world)
+
+    const bullet = ship.fire(world)
+
+    if (bullet && ownPlayerId) {
+      gameSocket.send({
+        type: 'fire',
+        x: bullet.pos.x,
+        y: bullet.pos.y,
+        angle: bullet.angle,
+        homing: false,
+      })
+    }
   }
 
   if (event.code === 'KeyH') {
@@ -501,11 +671,42 @@ function handleKeyDown(event) {
     const asteroid = [...world.ofKind('asteroid')][0]
 
     if (asteroid) {
-      ship.fireHoming(world, asteroid)
+      const bullet = ship.fireHoming(world, asteroid)
+
+      if (bullet && ownPlayerId) {
+        gameSocket.send({
+          type: 'fire',
+          x: bullet.pos.x,
+          y: bullet.pos.y,
+          angle: bullet.angle,
+          homing: true,
+        })
+      }
     }
   }
 }
 
+
+function appendChatMessage(name, text) {
+  const container = document.querySelector('#chatMessages')
+  if (!container) return
+
+  container.querySelector('.chat-empty')?.remove()
+  const line = document.createElement('p')
+  line.className = 'chat-message'
+
+  const sender = document.createElement('strong')
+  sender.textContent = `${String(name || 'Гравець').slice(0, 24)}: `
+  const body = document.createElement('span')
+  body.textContent = String(text || '').slice(0, 500)
+
+  line.append(sender, body)
+  container.appendChild(line)
+  while (container.children.length > 50) {
+    container.firstElementChild.remove()
+  }
+  container.scrollTop = container.scrollHeight
+}
 
 function render({
   totalSteps,
@@ -562,6 +763,11 @@ function render({
 
   for (const explosion of world.ofKind('explosion')) {
     drawExplosion(ctx, explosion)
+  }
+
+  // Відображаємо кораблі інших гравців, які надходять через WebSocket.
+  for (const player of remotePlayers.values()) {
+    drawRemoteShip(ctx, player)
   }
 
   if (ship.alive) {

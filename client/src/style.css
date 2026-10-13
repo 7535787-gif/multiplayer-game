@@ -57,6 +57,10 @@ body {
   pointer-events: none;
 }
 
+.game-ui > section {
+  pointer-events: auto;
+}
+
 /* Верхня ліва панель HUD. */
 .hud-panel {
   position: absolute;
@@ -550,5 +554,111 @@ kbd {
 
   .lobby-card {
     padding: 26px 22px;
+  }
+}
+
+/* Список гравців у правому верхньому куті. */
+#rosterPanel {
+  top: 20px;
+  right: 20px;
+  bottom: auto;
+  left: auto;
+  width: min(260px, calc(100vw - 40px));
+  min-width: 0;
+}
+
+/* Чат кімнати. */
+.chat-panel {
+  position: absolute;
+  right: 20px;
+  bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100vw - 40px));
+  max-height: min(300px, 42vh);
+  padding: 13px 15px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.chat-messages {
+  min-height: 70px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  color: #d6e5f2;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.chat-empty {
+  color: var(--muted);
+  margin: 8px 0;
+}
+
+.chat-message {
+  margin: 0 0 7px;
+}
+
+.chat-message strong {
+  color: var(--cyan);
+}
+
+.chat-form {
+  display: flex;
+  gap: 7px;
+}
+
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  outline: none;
+  background: rgba(4, 10, 18, 0.8);
+  color: #e8f2ff;
+  font: inherit;
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+.chat-send {
+  padding: 0 11px;
+  border: 1px solid rgba(196, 224, 201, 0.25);
+  border-radius: 7px;
+  background: #557d72;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+@media (max-width: 760px) {
+  #rosterPanel {
+    top: auto;
+    right: 10px;
+    bottom: 275px;
+    left: auto;
+    width: min(220px, calc(100vw - 20px));
+  }
+
+  .chat-panel {
+    right: 10px;
+    bottom: 100px;
+    width: min(340px, calc(100vw - 20px));
+    max-height: 180px;
+  }
+
+  .chat-messages {
+    max-height: 90px;
   }
 }
