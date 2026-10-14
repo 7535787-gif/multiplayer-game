@@ -197,6 +197,7 @@ let activeArena = {
 }
 
 let activePlayerName = ''
+let activeRoomId = ''
 let ownPlayerId = null
 const remotePlayers = new Map()
 let positionSendTimer = 0
@@ -313,11 +314,27 @@ if (message.type === 'fire') {
     return
   }
 
+  
   if (message.type === 'joined') {
     ownPlayerId = message.playerId
     lobbyUI.setBusy(false)
+
+    const room = lobby.rooms.find(
+      (item) => item.id === activeRoomId
+    )
+
+    if (!room) {
+      lobbyUI.setStatus(
+        'Не вдалося знайти вибрану кімнату.',
+        'error'
+      )
+      return
+    }
+
+    lobby.join(activePlayerName, activeRoomId)
     return
   }
+
 
   if (message.type === 'error') {
     lobbyUI.setBusy(false)
@@ -331,6 +348,7 @@ lobbyUI.addEventListener('join-request', (event) => {
 
   lobbyUI.setBusy(true)
   activePlayerName = playerName
+  activeRoomId = roomId
 
   gameSocket.send({
     type: 'join',
@@ -353,6 +371,7 @@ document.querySelector('#chatForm').addEventListener('submit', (event) => {
 // Гравець приєднався до вибраної кімнати.
 lobby.addEventListener('join', (event) => {
   const { playerName, room } = event.detail
+  console.log('[DEBUG] lobby join:', { playerName, room })
 
   activePlayerName = playerName
 
