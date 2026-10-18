@@ -1540,62 +1540,6 @@ npm run benchmark:protocol
 
 Експерименти також показали важливість правильного налаштування параметрів мережі: значення втрати пакетів потрібно задавати часткою, а не цілим числом відсотків. Для завершення експериментальної частини необхідно повторити перевірку з `loss=0.02`, порівняти `prediction=on` і `prediction=off` за однакових умов, а також записати GIF двох гравців поруч, як вимагає завдання.
 
-## 8. Джерела та матеріали
 
-- [Повний текст лабораторної роботи № 5 — Realtime Networking](https://github.com/rmalkevy/Programming-Practice-Projects/blob/main/courses/javascript/lab-05-realtime-networking.md)
-- [Нотатки до лабораторної роботи № 5 — теорія та експерименти](https://github.com/rmalkevy/Programming-Practice-Projects/blob/main/courses/javascript/lab-05-realtime-networking.notes.md)
 
-## 9. Демонстрація роботи
-
-**GIF-демонстрація:** потрібно додати 20-секундний GIF із двома вікнами браузера, у яких гравці рухаються та взаємодіють. За можливості слід залишити видимим netgraph з основними мережевими показниками.
-
-<!-- Після створення GIF додайте його до репозиторію та замініть цей коментар на:
-![Демонстрація мережевої взаємодії двох гравців](./docs/lab-05-two-players.gif)
--->
-
-## 10. Команди запуску та перевірки
-
-Встановлення залежностей:
-
-```bash
-npm install
-```
-
-Запуск сервера (в першому терміналі):
-
-```bash
-npm start
-```
-
-Запуск клієнта (в другому терміналі):
-
-```bash
-npm run dev
-```
-
-Запуск тестів:
-
-```bash
-npm test
-```
-
-Перевірка WebSocket:
-
-```bash
-node --test tests/websocket-smoke.test.js
-```
-
-Порівняння протоколів:
-
-```bash
-npm run benchmark:protocol
-```
-
-Для перевірки мережевих умов можна використати параметри URL, наприклад:
-
-```text
-http://localhost:5173/?delay=100&jitter=30&loss=0.02&prediction=on&protocol=binary
-```
-
-Для порівняння з вимкненим передбаченням змініть `prediction=on` на `prediction=off`. Для перевірки JSON замініть `protocol=binary` на `protocol=json`.
 
