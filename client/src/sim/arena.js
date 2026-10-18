@@ -1,3 +1,5 @@
+import { Vector2 } from './vector.js'
+
 export function wrapPosition(ship, width, height) {
   let wrapped = false
 
@@ -24,6 +26,6 @@ export function wrapPosition(ship, width, height) {
   // Якщо корабель перейшов через край,
   // не інтерполюємо його через весь екран
   if (wrapped) {
-    ship.previousPosition = ship.pos
+    ship.previousPosition = new Vector2(ship.pos.x, ship.pos.y)
   }
 }

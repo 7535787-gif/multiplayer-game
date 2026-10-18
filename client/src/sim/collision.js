@@ -94,20 +94,20 @@ function spawnExplosion(world, entity) {
   })
 }
 
-export function resolveCollisions(world) {
+export function resolveCollisions(world, { ignoreEntityIds = new Set() } = {}) {
   const entities = [...world]
 
   for (let i = 0; i < entities.length; i++) {
     const a = entities[i]
 
-    if (!a.alive) {
+    if (!a.alive || ignoreEntityIds.has(a.id)) {
       continue
     }
 
     for (let j = i + 1; j < entities.length; j++) {
       const b = entities[j]
 
-      if (!b.alive) {
+      if (!b.alive || ignoreEntityIds.has(b.id)) {
         continue
       }
 
@@ -201,9 +201,7 @@ function handleCollision(world, a, b) {
     a.takeDamage(10)
     notifyHit(b, a)
 
-    if (a.alive) {
-      a.resetAfterCollision()
-    } else {
+    if (!a.alive) {
       spawnExplosion(world, a)
     }
 
@@ -215,9 +213,7 @@ function handleCollision(world, a, b) {
     b.takeDamage(10)
     notifyHit(a, b)
 
-    if (b.alive) {
-      b.resetAfterCollision()
-    } else {
+    if (!b.alive) {
       spawnExplosion(world, b)
     }
 

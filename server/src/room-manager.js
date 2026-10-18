@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { Room } from './room.js'
 
 export class RoomManager {
@@ -7,6 +8,7 @@ export class RoomManager {
     this.onRoomCreated = onRoomCreated
   }
 
+  
   create(definition) {
     if (this.rooms.has(definition.id)) {
       throw new Error(`Кімната ${definition.id} вже існує`)
@@ -16,9 +18,14 @@ export class RoomManager {
       throw new Error('Досягнуто ліміту кімнат')
     }
 
-    const room = new Room(definition)
+    const seed = definition.seed ?? randomBytes(4).readUInt32LE(0)
+    const room = new Room({ ...definition, seed })
 
     room.once('empty', () => {
+      // Стандартні кімнати не видаляємо.
+      if (definition.persistent) return
+
+      // Тимчасові кімнати видаляємо, коли вони спорожніли.
       if (this.rooms.get(room.id) === room) {
         this.rooms.delete(room.id)
       }
@@ -49,4 +56,5 @@ export class RoomManager {
   delete(id) {
     return this.rooms.delete(id)
   }
+
 }

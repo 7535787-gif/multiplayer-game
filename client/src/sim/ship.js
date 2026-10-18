@@ -61,12 +61,9 @@ export class Ship extends Entity {
   }
 
   resetAfterCollision() {
-    this.pos = new Vector2(
-      this.spawnPosition.x,
-      this.spawnPosition.y
-    )
-
-    this.previousPosition = this.pos
+    // Collision should feel like an impact, not a teleport to the spawn point.
+    // Keep the ship where it hit the asteroid and stop its movement immediately.
+    this.previousPosition = new Vector2(this.pos.x, this.pos.y)
     this.vel = new Vector2(0, 0)
   }
 

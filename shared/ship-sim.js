@@ -1,4 +1,4 @@
-﻿export const FIXED_DT = 1 / 30
+export const FIXED_DT = 1 / 30
 
 export const SHIP_CONFIG = Object.freeze({
   acceleration: 220,
@@ -20,6 +20,9 @@ export function integrateShip(state, input, dt = FIXED_DT) {
 
   if (input.left) angle -= config.rotationSpeed * dt
   if (input.right) angle += config.rotationSpeed * dt
+
+  // Keep angles in the signed range used by the Int16 wire format.
+  angle = ((angle + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI
 
   if (input.thrust) {
     vx += Math.cos(angle) * config.acceleration * dt

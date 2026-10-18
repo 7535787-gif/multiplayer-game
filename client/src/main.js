@@ -1,7 +1,11 @@
+
 import './style.css'
 
 import { createLoop } from './loop.js'
 import { createInput } from './input.js'
+import { integrateShip, FIXED_DT } from '../../shared/ship-sim.js'
+import { reconcileShipState } from '../../shared/reconciliation.js'
+import { interpolateRemotePlayer } from '../../shared/interpolation.js'
 
 import { loadJson, loadAll } from './assets/loader.js'
 
@@ -48,7 +52,7 @@ app.innerHTML = `
         <div class="hud-logo">✦</div>
 
         <div>
-          <h1 class="hud-title">DOGFIGHT // SIMULATION</h1>
+          <h1 class="hud-title">ПОВІТРЯНИЙ БІЙ // СИМУЛЯЦІЯ</h1>
           <p class="hud-subtitle">
             <span class="status-indicator"></span>
             SYSTEM ONLINE · TRAINING MODE
@@ -58,7 +62,7 @@ app.innerHTML = `
 
       <div class="metrics-grid">
         <div class="metric metric--accent">
-          <span class="metric-label">SCORE / РАХУНОК</span>
+          <span class="metric-label">РАХУНОК</span>
           <strong class="metric-value" id="score">0</strong>
         </div>
 
@@ -100,27 +104,35 @@ app.innerHTML = `
         </div>
 
         <div class="metric">
-          <span class="metric-label">ANGLE / КУТ</span>
+          <span class="metric-label">КУТ</span>
           <strong class="metric-value" id="angle">0</strong>
         </div>
       </div>
     </section>
 
     <section class="controls-panel" id="rosterPanel">
-  <h2 class="controls-title">PLAYERS / УЧАСНИКИ</h2>
-  <ul class="controls-list" id="rosterList">
-    <li class="control-item">Очікування гравців...</li>
-  </ul>
-</section>
+      <h2 class="controls-title">PLAYERS / УЧАСНИКИ</h2>
+      <ul class="controls-list" id="rosterList">
+        <li class="control-item">Очікування гравців...</li>
+      </ul>
+    </section>
 
     <section class="chat-panel" id="chatPanel" aria-label="Ігровий чат">
       <h2 class="controls-title">ROOM CHAT / ЧАТ КІМНАТИ</h2>
+
       <div class="chat-messages" id="chatMessages" aria-live="polite">
         <p class="chat-empty">Повідомлень поки немає</p>
       </div>
+
       <form class="chat-form" id="chatForm">
-        <input class="chat-input" id="chatInput" maxlength="500"
-          autocomplete="off" placeholder="Напиши повідомлення..." aria-label="Повідомлення" />
+        <input
+          class="chat-input"
+          id="chatInput"
+          maxlength="500"
+          autocomplete="off"
+          placeholder="Напиши повідомлення..."
+          aria-label="Повідомлення"
+        />
         <button class="chat-send" type="submit">Надіслати</button>
       </form>
     </section>
@@ -129,15 +141,21 @@ app.innerHTML = `
       <h2 class="controls-title">FLIGHT CONTROLS / КЕРУВАННЯ</h2>
 
       <ul class="controls-list">
-        <li class="control-item"><kbd>↑</kbd><span>Тяга</span></li>
-        <li class="control-item"><kbd>↓</kbd><span>Гальмо / назад</span></li>
+        <li class="control-item">
+          <kbd>↑</kbd><span>Тяга</span>
+        </li>
+        <li class="control-item">
+          <kbd>↓</kbd><span>Гальмування / назад</span>
+        </li>
         <li class="control-item">
           <kbd>←</kbd><kbd>→</kbd><span>Поворот</span>
         </li>
         <li class="control-item">
           <kbd>Space</kbd><span>Постріл</span>
         </li>
-        <li class="control-item"><kbd>H</kbd><span>Homing</span></li>
+        <li class="control-item">
+          <kbd>H</kbd><span>Самонавідна ракета</span>
+        </li>
       </ul>
     </section>
 
@@ -165,14 +183,18 @@ app.innerHTML = `
 `
 
 const input = createInput()
+
+let inputSequence = 0
+const pendingInputs = []
+let lastCorrectionMagnitude = 0
+let correctionOffset = { x: 0, y: 0 }
 const gameCanvas = createCanvas()
 
 app.appendChild(gameCanvas.canvas)
 const lobby = new Lobby()
 const lobbyUI = new LobbyUI(app)
 
-const { ctx, width: initialWidth, height: initialHeight } =
-  gameCanvas
+const { ctx } = gameCanvas
 
 const startButton = document.querySelector('#startLoading')
 const loadingScreen = document.querySelector('#loadingScreen')
@@ -201,6 +223,14 @@ let activeRoomId = ''
 let ownPlayerId = null
 const remotePlayers = new Map()
 let positionSendTimer = 0
+let pingTimer = 0
+let lastSnapshotReceivedAt = 0
+let networkStatsAt = performance.now()
+let previousSentBytes = 0
+let previousReceivedBytes = 0
+let sentBytesPerSecond = 0
+let receivedBytesPerSecond = 0
+let lastSnapshotTick = -1
 
 // Отримали список кімнат.
 lobby.addEventListener('rooms-updated', (event) => {
@@ -219,17 +249,30 @@ lobby.addEventListener('lobby-error', (event) => {
 })
 
 const gameSocket = new GameSocket()
+let reconnectJoinRequired = false
+
+gameSocket.addEventListener('close', () => {
+  if (ownPlayerId && activeRoomId && activePlayerName) reconnectJoinRequired = true
+})
+
+gameSocket.addEventListener('open', () => {
+  if (!reconnectJoinRequired || !activeRoomId || !activePlayerName) return
+  reconnectJoinRequired = false
+  gameSocket.send({ type: 'join', name: activePlayerName, roomId: activeRoomId })
+})
 
 gameSocket.addEventListener('message', (event) => {
   let message
 
   try {
-    message = JSON.parse(event.detail)
+    message = typeof event.detail === 'string' ? JSON.parse(event.detail) : event.detail
   } catch {
     lobbyUI.setBusy(false)
     lobbyUI.setStatus('Сервер надіслав некоректне повідомлення', 'error')
     return
   }
+
+  if (message.type === 'pong') return
 
   if (message.type === 'roster') {
     const players = Array.isArray(message.players) ? message.players : []
@@ -250,9 +293,7 @@ gameSocket.addEventListener('message', (event) => {
         remotePlayers.set(player.id, {
           id: player.id,
           name: player.name,
-          x: Number(player.x) || activeArena.width / 2,
-          y: Number(player.y) || activeArena.height / 2,
-          angle: Number(player.angle) || 0,
+          samples: [],
         })
       }
     }
@@ -270,22 +311,80 @@ gameSocket.addEventListener('message', (event) => {
     return
   }
 
-  if (message.type === 'state') {
-    if (message.playerId && message.playerId !== ownPlayerId &&
-        Number.isFinite(message.x) && Number.isFinite(message.y) &&
-        Number.isFinite(message.angle)) {
-      remotePlayers.set(message.playerId, {
-        id: message.playerId,
-        name: String(message.name || 'Гравець'),
-        x: message.x,
-        y: message.y,
-        angle: message.angle,
-      })
+  if (message.type === 'snapshot') {
+    if (!Array.isArray(message.players)) return
+
+    if (Number.isInteger(message.tick) && message.tick <= lastSnapshotTick) return
+    lastSnapshotTick = Number.isInteger(message.tick) ? message.tick : lastSnapshotTick
+    lastSnapshotReceivedAt = Number.isFinite(message.receivedAt)
+      ? message.receivedAt
+      : performance.now()
+
+    const snapshotPlayerIds = new Set(
+      message.players.map((player) => player?.id).filter(Boolean),
+    )
+    for (const id of remotePlayers.keys()) {
+      if (!snapshotPlayerIds.has(id)) remotePlayers.delete(id)
     }
+
+    for (const player of message.players) {
+      if (!player.id) continue
+
+      if (player.id === ownPlayerId && ship) {
+        const before = { x: ship.pos.x, y: ship.pos.y }
+        const acknowledged = Number.isInteger(player.ackSeq) ? player.ackSeq : -1
+        let predicted = {
+          x: player.x, y: player.y, vx: player.vx, vy: player.vy, angle: player.angle,
+        }
+
+        if (gameSocket.networkOptions.prediction) {
+          const reconciliation = reconcileShipState({
+            authoritativeState: predicted,
+            pendingInputs,
+            acknowledgedSeq: acknowledged,
+            currentState: before,
+            arena: activeArena,
+            dt: FIXED_DT,
+          })
+          pendingInputs.splice(0, pendingInputs.length, ...reconciliation.pendingInputs)
+          predicted = reconciliation.state
+          lastCorrectionMagnitude = reconciliation.correctionMagnitude
+          // Keep the displayed ship continuous, then decay the offset over ~100 ms.
+          correctionOffset.x = reconciliation.correctionOffset.x + correctionOffset.x
+          correctionOffset.y = reconciliation.correctionOffset.y + correctionOffset.y
+        } else {
+          while (pendingInputs.length > 0 && pendingInputs[0].seq <= acknowledged) {
+            pendingInputs.shift()
+          }
+          lastCorrectionMagnitude = Math.hypot(predicted.x - before.x, predicted.y - before.y)
+          correctionOffset.x = 0
+          correctionOffset.y = 0
+        }
+
+        ship.previousPosition = new Vector2(predicted.x, predicted.y)
+        ship.pos.x = predicted.x
+        ship.pos.y = predicted.y
+        ship.angle = predicted.angle
+        ship.vel.x = predicted.vx
+        ship.vel.y = predicted.vy
+      } else {
+        let remote = remotePlayers.get(player.id)
+        if (!remote) {
+          remote = { id: player.id, name: player.name || 'Гравець', samples: [] }
+          remotePlayers.set(player.id, remote)
+        }
+        remote.name = player.name || remote.name || 'Гравець'
+        remote.samples.push({
+          x: player.x, y: player.y, angle: player.angle,
+          receivedAt: lastSnapshotReceivedAt,
+        })
+        if (remote.samples.length > 12) remote.samples.splice(0, remote.samples.length - 12)
+      }
+    }
+
     return
   }
 
-  
 if (message.type === 'fire') {
   if (
     message.playerId !== ownPlayerId &&
@@ -318,6 +417,17 @@ if (message.type === 'fire') {
   if (message.type === 'joined') {
     ownPlayerId = message.playerId
     lobbyUI.setBusy(false)
+
+    // Reconnection restores the server-side player without starting a second game loop.
+    if (gameStarted) {
+      remotePlayers.clear()
+      pendingInputs.length = 0
+      inputSequence = 0
+      correctionOffset = { x: 0, y: 0 }
+      lastCorrectionMagnitude = 0
+      lastSnapshotTick = -1
+      return
+    }
 
     const room = lobby.rooms.find(
       (item) => item.id === activeRoomId
@@ -371,7 +481,6 @@ document.querySelector('#chatForm').addEventListener('submit', (event) => {
 // Гравець приєднався до вибраної кімнати.
 lobby.addEventListener('join', (event) => {
   const { playerName, room } = event.detail
-  console.log('[DEBUG] lobby join:', { playerName, room })
 
   activePlayerName = playerName
 
@@ -387,7 +496,14 @@ lobby.addEventListener('join', (event) => {
   )
 
   remotePlayers.clear()
+  pendingInputs.length = 0
+  inputSequence = 0
+  correctionOffset = { x: 0, y: 0 }
+  lastCorrectionMagnitude = 0
   positionSendTimer = 0
+  pingTimer = 0
+  lastSnapshotReceivedAt = 0
+  lastSnapshotTick = -1
   initializeGame(room)
 
   gameStarted = true
@@ -422,7 +538,7 @@ function drawLoadingScreen(progress, status) {
   ctx.fillStyle = '#c6d3df'
   ctx.font = '12px "Segoe UI", sans-serif'
   ctx.fillText(
-    'DEEP SPACE  /  FLIGHT SYSTEM',
+    'ГЛИБОКИЙ КОСМОС / СИСТЕМА ПОЛЬОТУ',
     centerX,
     centerY - 72
   )
@@ -454,7 +570,7 @@ function drawLoadingScreen(progress, status) {
   ctx.roundRect(barX, barY, barWidth, barHeight, 4)
   ctx.fill()
 
-  // Реальний прогрес, отриманий із loadAll().
+  // Реальний прогрес завантаження, отриманий із loadAll().
   const safeProgress = Math.max(0, Math.min(1, progress))
   const fillWidth = barWidth * safeProgress
 
@@ -578,19 +694,50 @@ function findSafeSpawnPosition() {
   }
 }
 
+function updateCorrectionSmoothing(dt) {
+  const decay = Math.exp(-dt / 0.1)
+  correctionOffset.x *= decay
+  correctionOffset.y *= decay
+}
 function update(dt) {
-  world.step(dt, input)
+  updateCorrectionSmoothing(dt)
+  // The local world advances effects, asteroids and bullets. Ship prediction
+  // uses the same shared fixed 30 Hz step as the authoritative server.
+  world.step(dt, input, { skipEntityId: ship?.id })
 
-  // Передаємо позицію корабля серверу 20 разів на секунду.
   positionSendTimer += dt
-  if (positionSendTimer >= 0.05 && ownPlayerId && ship) {
-    positionSendTimer = 0
-    gameSocket.send({
-      type: 'state',
-      x: ship.pos.x,
-      y: ship.pos.y,
-      angle: ship.angle,
-    })
+  while (positionSendTimer >= FIXED_DT && ownPlayerId && ship) {
+    positionSendTimer -= FIXED_DT
+    const inputState = {
+      left: input.isDown('ArrowLeft'),
+      right: input.isDown('ArrowRight'),
+      thrust: input.isDown('ArrowUp'),
+      brake: input.isDown('ArrowDown'),
+    }
+    const seq = ++inputSequence
+    pendingInputs.push({ seq, input: inputState })
+    if (pendingInputs.length > 120) pendingInputs.shift()
+
+    if (gameSocket.networkOptions.prediction) {
+      ship.previousPosition = new Vector2(ship.pos.x, ship.pos.y)
+      const predicted = integrateShip({
+        x: ship.pos.x, y: ship.pos.y,
+        vx: ship.vel.x, vy: ship.vel.y, angle: ship.angle,
+      }, inputState, FIXED_DT)
+      ship.pos.x = ((predicted.x % activeArena.width) + activeArena.width) % activeArena.width
+      ship.pos.y = ((predicted.y % activeArena.height) + activeArena.height) % activeArena.height
+      ship.angle = predicted.angle
+      ship.vel.x = predicted.vx
+      ship.vel.y = predicted.vy
+    }
+
+    gameSocket.send({ type: 'input', seq, ...inputState })
+  }
+
+  pingTimer += dt
+  if (pingTimer >= 1 && ownPlayerId) {
+    pingTimer -= 1
+    gameSocket.send({ type: 'ping', sentAt: Math.round(performance.now()) })
   }
 
   if (ship.alive) {
@@ -674,13 +821,7 @@ function handleKeyDown(event) {
     const bullet = ship.fire(world)
 
     if (bullet && ownPlayerId) {
-      gameSocket.send({
-        type: 'fire',
-        x: bullet.pos.x,
-        y: bullet.pos.y,
-        angle: bullet.angle,
-        homing: false,
-      })
+      gameSocket.send({ type: 'fire', homing: false })
     }
   }
 
@@ -693,19 +834,48 @@ function handleKeyDown(event) {
       const bullet = ship.fireHoming(world, asteroid)
 
       if (bullet && ownPlayerId) {
-        gameSocket.send({
-          type: 'fire',
-          x: bullet.pos.x,
-          y: bullet.pos.y,
-          angle: bullet.angle,
-          homing: true,
-        })
+        gameSocket.send({ type: 'fire', homing: true })
       }
     }
   }
 }
 
 
+
+function drawRemoteShip(ctx, player) {
+  if (
+    !Number.isFinite(player.x) ||
+    !Number.isFinite(player.y) ||
+    !Number.isFinite(player.angle)
+  ) return
+
+  ctx.save()
+  ctx.translate(player.x, player.y)
+  ctx.rotate(player.angle)
+
+  ctx.strokeStyle = '#64d8ff'
+  ctx.fillStyle = 'rgba(100, 216, 255, 0.18)'
+  ctx.lineWidth = 2
+
+  ctx.beginPath()
+  ctx.moveTo(18, 0)
+  ctx.lineTo(-12, -10)
+  ctx.lineTo(-7, 0)
+  ctx.lineTo(-12, 10)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+
+  if (player.name) {
+    ctx.rotate(-player.angle)
+    ctx.fillStyle = '#d7f5ff'
+    ctx.font = '12px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(String(player.name).slice(0, 24), 0, 25)
+  }
+
+  ctx.restore()
+}
 function appendChatMessage(name, text) {
   const container = document.querySelector('#chatMessages')
   if (!container) return
@@ -732,7 +902,6 @@ function render({
   stepsPerSecond,
   framesPerSecond,
   frameTime,
-  alpha,
 }) {
   const width = gameCanvas.width
   const height = gameCanvas.height
@@ -784,13 +953,19 @@ function render({
     drawExplosion(ctx, explosion)
   }
 
-  // Відображаємо кораблі інших гравців, які надходять через WebSocket.
+  // Render remote ships slightly in the past between received snapshots.
+  const renderTime = performance.now() - gameSocket.networkOptions.interpolationMs
   for (const player of remotePlayers.values()) {
-    drawRemoteShip(ctx, player)
+    const interpolated = interpolateRemotePlayer(player, renderTime, activeArena)
+    if (interpolated) drawRemoteShip(ctx, interpolated)
   }
 
   if (ship.alive) {
-    drawShip(ctx, ship, alpha, assets.sprites.ship)
+    ctx.save()
+    ctx.translate(correctionOffset.x, correctionOffset.y)
+    const localAlpha = Math.max(0, Math.min(1, positionSendTimer / FIXED_DT))
+    drawShip(ctx, ship, localAlpha, assets.sprites.ship)
+    ctx.restore()
   }
 
   ctx.restore()
@@ -809,6 +984,42 @@ function render({
   document.querySelector('#angle').textContent = ship.angle.toFixed(2)
   document.querySelector('#speed').textContent =
     ship.vel.length().toFixed(1)
+
+  let netgraph = document.querySelector('#netgraph')
+  if (!netgraph) {
+    netgraph = document.createElement('div')
+    netgraph.id = 'netgraph'
+    Object.assign(netgraph.style, {
+      position: 'fixed', left: '12px', bottom: '8px', padding: '7px 10px',
+      background: 'rgba(0, 0, 0, 0.78)', color: '#d8f1ff',
+      font: '11px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace',
+      zIndex: '1000', border: '1px solid rgba(100,216,255,.35)',
+      borderRadius: '6px', pointerEvents: 'none', whiteSpace: 'pre-line',
+      maxWidth: 'min(780px, calc(100vw - 24px))',
+    })
+    document.body.appendChild(netgraph)
+  }
+
+  const now = performance.now()
+  const statsElapsed = (now - networkStatsAt) / 1000
+  if (statsElapsed >= 0.5) {
+    const stats = gameSocket.stats
+    sentBytesPerSecond = (stats.sentBytes - previousSentBytes) / statsElapsed
+    receivedBytesPerSecond = (stats.receivedBytes - previousReceivedBytes) / statsElapsed
+    previousSentBytes = stats.sentBytes
+    previousReceivedBytes = stats.receivedBytes
+    networkStatsAt = now
+  }
+  const net = gameSocket.networkOptions
+  const stats = gameSocket.stats
+  const snapshotAge = lastSnapshotReceivedAt ? now - lastSnapshotReceivedAt : Infinity
+  netgraph.textContent = [
+    `NETGRAPH  ${net.protocol.toUpperCase()}  tick:${lastSnapshotTick}`,
+    `RTT: ${stats.lastRttMs == null ? '—' : `${stats.lastRttMs.toFixed(1)} ms`} | snapshot age: ${Number.isFinite(snapshotAge) ? `${snapshotAge.toFixed(1)} ms` : '—'}`,
+    `bytes/s: ↑${sentBytesPerSecond.toFixed(0)} ↓${receivedBytesPerSecond.toFixed(0)} | input queue: ${pendingInputs.length}`,
+    `correction: ${lastCorrectionMagnitude.toFixed(2)} px | dropped: ${stats.droppedPackets}`,
+    `network: ${net.delay} ms +/−${net.jitter} ms, loss ${(net.loss * 100).toFixed(1)}% | interp ${net.interpolationMs} ms | prediction ${net.prediction ? 'ON' : 'OFF'}`,
+  ].join('\n')
 
   const hp = Math.max(0, Math.min(100, ship.hp))
   document.querySelector('#hp').textContent = hp
@@ -877,7 +1088,7 @@ async function startLoading() {
         if (progress.status === 'loaded') {
           status =
             `Завантажено ${progress.item}: ` +
-            `${progress.loaded} з ${progress.total}`
+            `${progress.loaded} із ${progress.total}`
         } else if (progress.status === 'error') {
           status = `Помилка ресурсу: ${progress.item}`
         }
@@ -886,7 +1097,7 @@ async function startLoading() {
       },
     })
 
-    console.info('Ресурси Lab 3 завантажено', {
+    console.info('Ресурси лабораторної роботи 3 завантажено', {
       sprites: Object.keys(assets.sprites),
       sounds: Object.keys(assets.sounds),
       arena: assets.arena,
@@ -925,3 +1136,8 @@ startButton.addEventListener('click', startLoading)
 
 // Перша заставка до натискання кнопки.
 drawLoadingScreen(0, 'Натисни кнопку, щоб підготувати гру')
+
+
+
+
+

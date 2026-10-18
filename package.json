@@ -11,8 +11,10 @@
     "dev": "npm run dev -w client",
     "build": "npm run build -w client",
     "start": "npm run start -w server",
-    "lint": "eslint client/src server",
-    "format": "prettier --write ."
+    "lint": "eslint --config client/eslint.config.js client/src server shared tests",
+    "format": "prettier --write .",
+    "test": "node --test",
+    "benchmark:protocol": "node tests/protocol-benchmark.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

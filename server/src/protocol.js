@@ -36,19 +36,29 @@ export function validateMessage(message) {
       return { valid: true }
     }
 
-    case 'state': {
+    case 'input': {
       if (
-        !Number.isFinite(message.x) ||
-        !Number.isFinite(message.y) ||
-        !Number.isFinite(message.angle)
+        !Number.isSafeInteger(message.seq) ||
+        message.seq < 0 ||
+        typeof message.left !== 'boolean' ||
+        typeof message.right !== 'boolean' ||
+        typeof message.thrust !== 'boolean' ||
+        typeof message.brake !== 'boolean'
       ) {
         return {
           valid: false,
           code: 1008,
-          reason: 'Invalid player state',
+          reason: 'Invalid input message',
         }
       }
 
+      return { valid: true }
+    }
+
+    case 'ping': {
+      if (!Number.isFinite(message.sentAt)) {
+        return { valid: false, code: 1008, reason: 'Invalid ping message' }
+      }
       return { valid: true }
     }
 
@@ -71,19 +81,10 @@ export function validateMessage(message) {
     case 'fire': {
       if (
         typeof message.homing !== 'boolean' ||
-        !Number.isFinite(message.x) ||
-        !Number.isFinite(message.y) ||
-        !Number.isFinite(message.angle) ||
-        Math.abs(message.x) > 100000 ||
-        Math.abs(message.y) > 100000
+        'x' in message || 'y' in message || 'angle' in message
       ) {
-        return {
-          valid: false,
-          code: 1008,
-          reason: 'Invalid fire message',
-        }
+        return { valid: false, code: 1008, reason: 'Invalid fire message' }
       }
-
       return { valid: true }
     }
 
