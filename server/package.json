@@ -4,10 +4,11 @@
     "private": true,
     "type": "module",
     "scripts": {
-      "start": "node src/index.js",
-      "dev": "node --env-file=.env src/index.js"
+        "start": "node --experimental-strip-types src/index.ts",
+        "dev": "node --experimental-strip-types --env-file=.env src/index.ts",
+        "typecheck": "tsc --noEmit -p ."
     },
     "dependencies": {
-      "ws": "^8.22.0"
+        "ws": "^8.22.0"
     }
-  }
+}

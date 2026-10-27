@@ -1,0 +1,64 @@
+import type { ArenaSize } from './types.js'
+
+export interface RemoteSample {
+  readonly x: number
+  readonly y: number
+  readonly angle: number
+  readonly receivedAt: number
+}
+
+export interface RemotePlayer {
+  readonly name: string
+  readonly samples: readonly RemoteSample[]
+}
+
+export interface InterpolatedPlayer extends RemoteSample {
+  readonly name: string
+}
+
+export function interpolateRemotePlayer(
+  player: RemotePlayer | null | undefined,
+  renderTime: number,
+  arena: ArenaSize | null = null,
+): InterpolatedPlayer | null {
+  const samples = player?.samples ?? []
+  if (samples.length === 0 || !player) return null
+
+  const first = samples[0]
+  if (!first) return null
+  if (samples.length === 1 || renderTime <= first.receivedAt) {
+    return { ...first, name: player.name }
+  }
+
+  for (let index = 1; index < samples.length; index++) {
+    const older = samples[index - 1]
+    const newer = samples[index]
+    if (!older || !newer) continue
+    if (renderTime <= newer.receivedAt) {
+      const span = Math.max(1, newer.receivedAt - older.receivedAt)
+      const alpha = Math.max(0, Math.min(1, (renderTime - older.receivedAt) / span))
+      let angleDelta = newer.angle - older.angle
+      while (angleDelta > Math.PI) angleDelta -= Math.PI * 2
+      while (angleDelta < -Math.PI) angleDelta += Math.PI * 2
+
+      let deltaX = newer.x - older.x
+      let deltaY = newer.y - older.y
+      if (arena) {
+        if (deltaX > arena.width / 2) deltaX -= arena.width
+        if (deltaX < -arena.width / 2) deltaX += arena.width
+        if (deltaY > arena.height / 2) deltaY -= arena.height
+        if (deltaY < -arena.height / 2) deltaY += arena.height
+      }
+      let x = older.x + deltaX * alpha
+      let y = older.y + deltaY * alpha
+      if (arena) {
+        x = ((x % arena.width) + arena.width) % arena.width
+        y = ((y % arena.height) + arena.height) % arena.height
+      }
+      return { name: player.name, x, y, angle: older.angle + angleDelta * alpha, receivedAt: renderTime }
+    }
+  }
+
+  const last = samples[samples.length - 1]
+  return last ? { ...last, name: player.name } : null
+}

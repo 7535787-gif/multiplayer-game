@@ -662,3 +662,203 @@ kbd {
     max-height: 90px;
   }
 }
+
+
+/* ===== Компактний HUD: Lab 6 ===== */
+
+.hud-panel {
+  top: 14px;
+  left: 14px;
+  width: min(350px, calc(100vw - 28px));
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(10, 20, 32, 0.82);
+}
+
+.hud-heading {
+  gap: 9px;
+  padding-bottom: 9px;
+  margin-bottom: 9px;
+}
+
+.hud-logo {
+  flex-basis: 32px;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  border-radius: 9px;
+}
+
+.hud-title {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.hud-subtitle {
+  margin-top: 3px;
+  font-size: 9px;
+}
+
+.metrics-grid {
+  gap: 6px;
+}
+
+.metric {
+  padding: 7px 8px;
+  border-radius: 7px;
+}
+
+.metric-label {
+  margin-bottom: 4px;
+  font-size: 9px;
+}
+
+.metric-value {
+  font-size: 13px;
+}
+
+/* Керування: компактніше та вище нижнього краю */
+.controls-panel {
+  left: 14px;
+  bottom: 14px;
+  width: min(390px, calc(100vw - 440px));
+  min-width: 250px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(10, 20, 32, 0.9);
+}
+
+.controls-title {
+  margin-bottom: 7px;
+}
+
+.controls-list {
+  gap: 6px 10px;
+}
+
+.control-item {
+  font-size: 10px;
+}
+
+kbd {
+  min-width: 21px;
+  height: 21px;
+  border-radius: 5px;
+}
+
+/* Міцність корабля */
+.health-panel {
+  bottom: 14px;
+  width: min(290px, calc(100vw - 32px));
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: rgba(10, 20, 32, 0.86);
+}
+
+.health-top {
+  margin-bottom: 7px;
+}
+
+.health-value {
+  font-size: 15px;
+}
+
+.health-track {
+  height: 5px;
+}
+
+/* Список гравців */
+#rosterPanel {
+  top: 14px;
+  right: 14px;
+  width: 210px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: rgba(10, 20, 32, 0.82);
+}
+
+/* Чат */
+.chat-panel {
+  right: 14px;
+  bottom: 14px;
+  width: 300px;
+  max-height: min(250px, 35vh);
+  padding: 11px 12px;
+  border-radius: 10px;
+  background: rgba(10, 20, 32, 0.88);
+}
+
+.chat-messages {
+  min-height: 36px;
+  max-height: 125px;
+  font-size: 11px;
+}
+
+.chat-input {
+  height: 32px;
+}
+
+.chat-send {
+  padding: 0 10px;
+}
+
+/* Менші екрани */
+@media (max-width: 900px) {
+  .hud-panel {
+    top: 8px;
+    left: 8px;
+    width: min(320px, calc(100vw - 16px));
+    padding: 9px;
+  }
+
+  .controls-panel {
+    left: 8px;
+    bottom: 8px;
+    width: min(300px, calc(100vw - 16px));
+    min-width: 0;
+  }
+
+  .health-panel {
+    bottom: 8px;
+    width: min(240px, calc(100vw - 24px));
+    padding: 9px 11px;
+  }
+
+  #rosterPanel {
+    top: 8px;
+    right: 8px;
+    width: min(190px, calc(100vw - 16px));
+  }
+
+  .chat-panel {
+    right: 8px;
+    bottom: 8px;
+    width: min(280px, calc(100vw - 16px));
+  }
+}
+
+@media (max-width: 520px) {
+  .health-panel {
+    bottom: 125px;
+  }
+
+  .controls-panel {
+    bottom: 8px;
+  }
+
+  .chat-panel {
+    bottom: 8px;
+    max-height: 110px;
+  }
+
+  .chat-messages {
+    min-height: 20px;
+    max-height: 35px;
+  }
+
+  #rosterPanel {
+    top: auto;
+    bottom: 235px;
+  }
+}
+

@@ -990,7 +990,7 @@ function render({
     netgraph = document.createElement('div')
     netgraph.id = 'netgraph'
     Object.assign(netgraph.style, {
-      position: 'fixed', left: '12px', bottom: '8px', padding: '7px 10px',
+      position: 'fixed', left: '12px', bottom: '100px', padding: '7px 10px',
       background: 'rgba(0, 0, 0, 0.78)', color: '#d8f1ff',
       font: '11px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace',
       zIndex: '1000', border: '1px solid rgba(100,216,255,.35)',

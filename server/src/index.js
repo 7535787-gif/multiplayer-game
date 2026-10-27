@@ -9,7 +9,7 @@ import { RoomManager } from './room-manager.js'
 import { loadConfig } from './config.js'
 import { createLogger } from './logger.js'
 import { createMatchLogger } from './match-logger.js'
-import { validateMessage } from './protocol.js'
+import { parseClientMessage } from '../../shared/protocol.js'
 import { createReadStream } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 
@@ -566,19 +566,24 @@ wss.on('connection', (ws) => {
       return
     }
 
-    const validation = validateMessage(message)
+    const validation = parseClientMessage(message)
+    
+    if (!validation.ok) {
+      const reason = `Invalid message: ${validation.error.issues
+        .map((issue) => issue.message)
+        .join('; ')}`
+    
+    logEvent('invalid-protocol-message', {
+      playerId: player.id,
+      type: message?.type,
+      reason,
+  })
 
-    if (!validation.valid) {
-      logEvent('invalid-protocol-message', {
-        playerId: player.id,
-        type: message?.type,
-        reason: validation.reason,
-      })
+  ws.close(1008, reason)
+  return
+}
 
-      ws.close(validation.code, validation.reason)
-      return
-    }
-
+message = validation.value
     if (message.type === 'join') {
       if (joined) {
         ws.close(1008, 'Already joined')
