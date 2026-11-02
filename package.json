@@ -13,7 +13,7 @@
     "start": "npm run start -w server",
     "lint": "eslint --config client/eslint.config.js client/src server shared tests",
     "format": "prettier --write .",
-    "test": "vitest run && node --test",
+    "test": "vitest run && node --test \"tests/*.test.js\"",
     "benchmark:protocol": "node tests/protocol-benchmark.js",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p client && tsc --noEmit -p server",
     "test:unit": "vitest run",
