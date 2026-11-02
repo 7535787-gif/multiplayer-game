@@ -13,8 +13,8 @@ export default [
       sourceType: "module",
 
       globals: {
-        window: "readonly", document: "readonly", console: "readonly", DOMException: "readonly", Image: "readonly",
-        performance: "readonly", requestAnimationFrame: "readonly",
+        window: "readonly", Worker: "readonly", Float32Array: "readonly", document: "readonly", console: "readonly", DOMException: "readonly", Image: "readonly",
+        performance: "readonly", requestAnimationFrame: "readonly", cancelAnimationFrame: "readonly", PerformanceObserver: "readonly",
         location: "readonly", URL: "readonly", URLSearchParams: "readonly",
         TextEncoder: "readonly", TextDecoder: "readonly", WebSocket: "readonly",
         CustomEvent: "readonly", Event: "readonly", EventTarget: "readonly",

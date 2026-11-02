@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { entityIdSchema, seqSchema, tickSchema } from './types.js'
-import type { Snapshot, ShipInput } from './types.js'
-import { decodePacket, encodeSnapshot } from './network-protocol.js'
+import { entityIdSchema, seqSchema, tickSchema } from './types.ts'
+import type { Snapshot, ShipInput } from './types.ts'
+import { decodePacket, encodeSnapshot } from './network-protocol.ts'
 
 const MAX_NAME_LENGTH = 24
 const MAX_CHAT_LENGTH = 500

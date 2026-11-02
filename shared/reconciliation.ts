@@ -58,6 +58,6 @@ export function reconcileShipState({
     state,
     pendingInputs: remainingInputs,
     correctionMagnitude: Math.hypot(dx, dy),
-    correctionOffset: { x: -dx, y: -dy },
+    correctionOffset: { x: dx === 0 ? 0 : -dx, y: dy === 0 ? 0 : -dy },
   }
 }

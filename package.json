@@ -13,18 +13,34 @@
     "start": "npm run start -w server",
     "lint": "eslint --config client/eslint.config.js client/src server shared tests",
     "format": "prettier --write .",
-    "test": "node --test",
+    "test": "vitest run && node --test",
     "benchmark:protocol": "node tests/protocol-benchmark.js",
-    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p client && tsc --noEmit -p server"
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p client && tsc --noEmit -p server",
+    "test:unit": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:shared": "vitest run shared",
+    "test:client": "vitest run client/src",
+    "test:server": "vitest run server/src",
+    "loadtest": "node scripts/load-test.mjs",
+    "profile:server": "node --cpu-prof --experimental-strip-types server/src/index.ts",
+    "benchmark:worker": "node scripts/worker-benchmark.mjs",
+    "bots": "node scripts/add-bots.mjs",
+    "perf:capture": "node scripts/perf-capture.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.56.0",
     "@types/node": "^26.6.5",
     "@types/ws": "^8.18.2",
+    "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
+    "fast-check": "^4.3.0",
     "prettier": "^3.9.9",
-    "typescript": "^5.8.3"
+    "tsx": "^4.23.15",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "zod": "^3.25.76"

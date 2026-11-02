@@ -1,10 +1,15 @@
 
 import './style.css'
 
+if (typeof window !== 'undefined') Object.assign(window, { __lab7WorkerBenchmark: benchmarkParticleWorker })
+
 import { createLoop } from './loop.js'
+import { recordFrameTime } from './performance.js'
+import { benchmarkParticleWorker } from './workers/particle-worker-benchmark.js'
 import { createInput } from './input.js'
 import { integrateShip, FIXED_DT } from '../../shared/ship-sim.js'
 import { reconcileShipState } from '../../shared/reconciliation.js'
+import { measureLab7 } from './performance.js'
 import { interpolateRemotePlayer } from '../../shared/interpolation.js'
 
 import { loadJson, loadAll } from './assets/loader.js'
@@ -338,6 +343,7 @@ gameSocket.addEventListener('message', (event) => {
         }
 
         if (gameSocket.networkOptions.prediction) {
+          performance.mark('lab7:reconcile:start')
           const reconciliation = reconcileShipState({
             authoritativeState: predicted,
             pendingInputs,
@@ -352,6 +358,7 @@ gameSocket.addEventListener('message', (event) => {
           // Keep the displayed ship continuous, then decay the offset over ~100 ms.
           correctionOffset.x = reconciliation.correctionOffset.x + correctionOffset.x
           correctionOffset.y = reconciliation.correctionOffset.y + correctionOffset.y
+          measureLab7('lab7:reconcile', 'lab7:reconcile:start')
         } else {
           while (pendingInputs.length > 0 && pendingInputs[0].seq <= acknowledged) {
             pendingInputs.shift()
@@ -903,6 +910,7 @@ function render({
   framesPerSecond,
   frameTime,
 }) {
+  recordFrameTime(frameTime)
   const width = gameCanvas.width
   const height = gameCanvas.height
 

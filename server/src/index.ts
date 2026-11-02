@@ -9,9 +9,12 @@ import { RoomManager } from './room-manager.ts'
 import { loadConfig } from './config.ts'
 import { createLogger } from './logger.ts'
 import { createMatchLogger } from './match-logger.ts'
+import { createTokenBucket } from './rate-limiter.ts'
 import { parseClientMessage } from '../../shared/protocol.ts'
 import { createReadStream } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
+import { performance as nodePerformance, monitorEventLoopDelay } from 'node:perf_hooks'
+import { addBots, tickBots } from './bots.ts'
 import type { IncomingMessage } from 'node:http'
 import type { RawData } from 'ws'
 import type { RoomPlayer } from './room.js'
@@ -210,6 +213,10 @@ for (const definition of roomDefinitions) {
 }
 
 const rssSamples: RssSample[] = []
+const tickDurations: number[] = []
+const eventLoopHistogram = monitorEventLoopDelay({ resolution: 20 })
+eventLoopHistogram.enable()
+let eventLoopUtilization = nodePerformance.eventLoopUtilization()
 const rssStartedAt = Date.now()
 
 const rssTimer = setInterval(() => {
@@ -254,6 +261,38 @@ const server = createServer(async (req, res) => {
       }),
     )
   
+    return
+  }
+
+  if (req.method === 'GET' && pathname === '/metrics') {
+    const sorted = [...tickDurations].sort((a, b) => a - b)
+    const percentile = (p: number) => sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1)] ?? 0 : 0
+    const current = nodePerformance.eventLoopUtilization()
+    const elu = nodePerformance.eventLoopUtilization(current, eventLoopUtilization)
+    eventLoopUtilization = current
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ tickSamples: sorted.length, tickP50Ms: percentile(.50), tickP95Ms: percentile(.95), tickP99Ms: percentile(.99), eventLoopUtilization: elu.utilization, eventLoopDelayP99Ms: Number(eventLoopHistogram.percentile(99) / 1e6), rssBytes: process.memoryUsage().rss }))
+    return
+  }
+
+  const botRoute = pathname.match(/^\/api\/rooms\/([a-zA-Z0-9_-]+)\/bots$/)
+  if (req.method === 'POST' && botRoute) {
+    const room = roomManager.get(botRoute[1] ?? '')
+    if (!room) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Room not found' })); return }
+    const chunks: Buffer[] = []
+    let size = 0
+    req.on('data', (chunk: Buffer) => { size += chunk.length; if (size <= 2048) chunks.push(chunk) })
+    req.on('end', () => {
+      if (size > 2048) { res.writeHead(413); res.end(); return }
+      let body: unknown = {}
+      try { if (chunks.length) body = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid JSON' })); return }
+      const count = isRecord(body) ? body.count : undefined
+      if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > 8) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'count must be an integer from 1 to 8' })); return }
+      const added = addBots(room, count)
+      broadcastRoster(room.id)
+      res.writeHead(201, { 'Content-Type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify({ added: added.length, bots: added.map(({ id, name }) => ({ id, name })), room: room.toJSON() }))
+    })
     return
   }
 
@@ -393,14 +432,14 @@ const server = createServer(async (req, res) => {
       if (
         typeof maxPlayers !== 'number' || !Number.isInteger(maxPlayers) ||
         maxPlayers < 2 ||
-        maxPlayers > 8
+        maxPlayers > 128
       ) {
         res.writeHead(400, {
           'Content-Type': 'application/json; charset=utf-8',
         })
         res.end(
           JSON.stringify({
-            error: 'maxPlayers must be an integer from 2 to 8',
+            error: 'maxPlayers must be an integer from 2 to 128',
           }),
         )
         return
@@ -555,13 +594,10 @@ wss.on('connection', (socketWs) => {
   }
 
   let joined = false
-  let messageCount = 0
+  const messageBucket = createTokenBucket({ capacity: 120, refillPerSecond: 120 })
 
   ws.missedPongs = 0
 
-  const rateTimer = setInterval(() => {
-    messageCount = 0
-  }, 1000)
 
   const joinTimer = setTimeout(() => {
     if (!joined) {
@@ -575,9 +611,7 @@ wss.on('connection', (socketWs) => {
   })
 
   ws.on('message', (raw, isBinary) => {
-    messageCount++
-
-    if (messageCount > 120) {
+    if (!messageBucket.consume()) {
       logEvent('rate-limit', { playerId: player.id })
       ws.close(1008, 'Rate limit exceeded')
       return
@@ -759,7 +793,6 @@ if (clientMessage.type === 'fire') {
 
   ws.on('close', () => {
     clearTimeout(joinTimer)
-    clearInterval(rateTimer)
 
     if (joined) {
       const roomId = player.roomId
@@ -812,6 +845,7 @@ async function shutdown() {
   console.log('Завершення сервера...')
   clearInterval(heartbeat)
   clearInterval(rssTimer)
+  eventLoopHistogram.disable()
   if (simulationTimer !== null) clearTimeout(simulationTimer)
 
   try {
@@ -890,9 +924,19 @@ function runSimulation() {
   const now = performance.now()
 
   while (now >= nextSimulationTime) {
+    const tickStartedAt = performance.now()
     for (const room of roomManager.values()) {
+      const botShots = tickBots(room)
+      for (const bot of botShots) {
+        const payload = JSON.stringify({ type: 'fire', playerId: bot.id, x: bot.x + Math.cos(bot.angle) * 20, y: bot.y + Math.sin(bot.angle) * 20, angle: bot.angle, homing: false })
+        for (const client of wss.clients) {
+          if (client.readyState === WebSocket.OPEN && client.playerRoomId === room.id && client.bufferedAmount < 1024 * 1024) client.send(payload)
+        }
+      }
       room.simulateStep()
     }
+    tickDurations.push(performance.now() - tickStartedAt)
+    if (tickDurations.length > 2000) tickDurations.shift()
     nextSimulationTime += SIMULATION_STEP_MS
   }
 

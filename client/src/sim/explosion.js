@@ -1,5 +1,6 @@
 import { Entity } from './entity.js'
 import { Vector2 } from './vector.js'
+import { particlePool } from './particle-pool.js'
 
 export class Explosion extends Entity {
   constructor(position) {
@@ -46,6 +47,8 @@ export class Explosion extends Entity {
 
     if (this.ttl <= 0) {
       this.alive = false
+      for (const particle of this.particles) particlePool.release(particle)
+      this.particles.length = 0
     }
   }
 }

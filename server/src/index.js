@@ -567,12 +567,10 @@ wss.on('connection', (ws) => {
     }
 
     const validation = parseClientMessage(message)
-    
     if (!validation.ok) {
       const reason = `Invalid message: ${validation.error.issues
         .map((issue) => issue.message)
         .join('; ')}`
-    
     logEvent('invalid-protocol-message', {
       playerId: player.id,
       type: message?.type,

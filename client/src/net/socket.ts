@@ -1,3 +1,4 @@
+import { measureLab7 } from '../performance.js'
 
 import { decodePacket, encodeInput } from '../../../shared/network-protocol.js'
 import { serverMessageSchema, type ClientMessage, type ServerMessage } from '../../../shared/protocol.js'
@@ -69,7 +70,9 @@ export class GameSocket extends EventTarget {
 
       let message: ServerMessage
       try {
+        performance.mark('lab7:decode:start')
         const raw: unknown = typeof event.data === 'string' ? JSON.parse(event.data) : decodePacket(event.data)
+        measureLab7('lab7:decode', 'lab7:decode:start')
         message = serverMessageSchema.parse(raw)
       } catch (error) {
         this.dispatchEvent(new CustomEvent('protocol-error', { detail: error }))

@@ -1,14 +1,16 @@
+
 {
-    "name": "server",
-    "version": "1.0.0",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "start": "node --experimental-strip-types src/index.ts",
-        "dev": "node --experimental-strip-types --env-file=.env src/index.ts",
-        "typecheck": "tsc --noEmit -p ."
-    },
-    "dependencies": {
-        "ws": "^8.22.0"
-    }
+  "name": "server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx --env-file=.env src/index.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run --config ../vitest.config.ts --root .."
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  }
 }
