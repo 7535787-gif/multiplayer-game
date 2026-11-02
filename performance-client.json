@@ -1,0 +1,19 @@
+{
+  "roomId": "room-18af60dd-1da6-4892-b2e4-3b6b356f5def",
+  "bots": 8,
+  "durationSeconds": 30,
+  "capturedAt": "2026-11-02T09:36:47.143Z",
+  "frameCount": 1797,
+  "p50": 16.699999999999818,
+  "p95": 16.799999999999272,
+  "p99": 16.80000000000291,
+  "gcEvents": 0,
+  "gcDurationMs": 0,
+  "longTasks": 2,
+  "measures": {
+    "lab7:simulate": 0.10149501662305324,
+    "lab7:render": 0.752531997765672,
+    "lab7:decode": 0,
+    "lab7:reconcile": 0.018050941308611717
+  }
+}

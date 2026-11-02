@@ -78,7 +78,7 @@ const roomDefinitions = [
     id: 'deep-space',
     name: 'Deep Space',
     arena: { width: 1200, height: 800 },
-    maxPlayers: 8,
+    maxPlayers: 16,
     persistent: true,
   },
   {

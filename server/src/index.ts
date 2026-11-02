@@ -90,11 +90,11 @@ function logMatch(roomId: string, event: Record<string, unknown>): void {
   if (!matchLogger) return
 
   if (matchLogger instanceof Promise) {
-    matchLogger.then((resolvedLogger) => {
-      resolvedLogger?.log(event).catch((error: unknown) => {
+    void matchLogger
+      .then((resolvedLogger) => resolvedLogger?.log(event))
+      .catch((error: unknown) => {
         console.error(`Помилка журналу кімнати ${roomId}:`, error)
       })
-    })
     return
   }
 
@@ -116,7 +116,7 @@ const roomDefinitions = [
     id: 'deep-space',
     name: 'Deep Space',
     arena: { width: 1200, height: 800 },
-    maxPlayers: 8,
+    maxPlayers: 16,
     persistent: true,
   },
   {
