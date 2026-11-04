@@ -861,3 +861,267 @@ kbd {
     bottom: 235px;
   }
 }
+
+.hud-panel {
+  top: 14px;
+  left: 14px;
+  width: min(310px, calc(100vw - 28px));
+  padding: 10px 12px;
+  background: rgba(10, 20, 32, 0.76);
+}
+
+.hud-heading {
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+.metrics-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.metric {
+  padding: 7px 8px;
+}
+
+.metric-label {
+  margin-bottom: 3px;
+}
+
+.metric-value {
+  font-size: 13px;
+}
+
+.controls-panel {
+  left: 14px;
+  bottom: 14px;
+  width: auto;
+  max-width: min(520px, calc(100vw - 28px));
+  min-width: 0;
+  padding: 9px 11px;
+  background: rgba(10, 20, 32, 0.76);
+}
+
+.controls-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.debug-hint {
+  color: #91a7b8;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.controls-list {
+  gap: 5px 10px;
+}
+
+.control-item {
+  font-size: 10px;
+}
+
+#netgraph {
+  display: none;
+  left: 14px !important;
+  bottom: 86px !important;
+  padding: 9px 11px !important;
+  border-radius: 8px !important;
+  font-size: 10px !important;
+  line-height: 1.5 !important;
+  backdrop-filter: blur(10px);
+}
+
+#netgraph.is-visible {
+  display: block;
+}
+
+@media (max-width: 760px) {
+  .hud-panel {
+    top: 8px;
+    left: 8px;
+    width: min(280px, calc(100vw - 16px));
+    padding: 8px 9px;
+  }
+
+  .controls-panel {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+    max-width: none;
+    padding: 8px 9px;
+  }
+
+  .controls-list {
+    gap: 5px 8px;
+  }
+
+  .control-item {
+    font-size: 9px;
+  }
+
+  #netgraph {
+    left: 8px !important;
+    bottom: 95px !important;
+    max-width: calc(100vw - 16px) !important;
+    font-size: 9px !important;
+  }
+}
+
+/* ===== Оновлений компактний інтерфейс ===== */
+
+/* Компактна панель статистики */
+.hud-panel {
+  top: 12px;
+  left: 12px;
+  width: min(260px, calc(100vw - 24px));
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(10, 20, 32, 0.72);
+}
+
+.hud-heading {
+  gap: 8px;
+  padding-bottom: 7px;
+  margin-bottom: 7px;
+}
+
+.hud-logo {
+  flex-basis: 28px;
+  width: 28px;
+  height: 28px;
+  font-size: 15px;
+}
+
+.hud-title {
+  font-size: 10px;
+  letter-spacing: 0.07em;
+}
+
+.hud-subtitle {
+  font-size: 8px;
+}
+
+/* Прибираємо технічні показники з основного HUD */
+.metric:has(#steps),
+.metric:has(#stepsPerSecond),
+.metric:has(#frameTime),
+.metric:has(#x),
+.metric:has(#y),
+.metric:has(#angle) {
+  display: none;
+}
+
+.metrics-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.metric {
+  padding: 6px 7px;
+}
+
+.metric-label {
+  font-size: 8px;
+  margin-bottom: 3px;
+}
+
+.metric-value {
+  font-size: 12px;
+}
+
+/* Компактне керування */
+.controls-panel {
+  left: 12px;
+  bottom: 12px;
+  width: auto;
+  max-width: calc(100vw - 24px);
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: rgba(10, 20, 32, 0.76);
+}
+
+.controls-title {
+  margin-bottom: 6px;
+  font-size: 9px;
+}
+
+.controls-list {
+  gap: 5px 9px;
+}
+
+.control-item {
+  font-size: 10px;
+}
+
+kbd {
+  min-width: 21px;
+  height: 21px;
+}
+
+/* Підказка для мережевої статистики */
+.debug-hint {
+  color: #91a7b8;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+/* NETGRAPH прихований до натискання N */
+#netgraph {
+  display: none !important;
+}
+
+#netgraph.is-visible {
+  display: block !important;
+}
+
+/* Здоров'я корабля */
+.health-panel {
+  bottom: 12px;
+  width: min(260px, calc(100vw - 24px));
+  padding: 9px 12px;
+}
+
+.health-label {
+  font-size: 9px;
+}
+
+.health-value {
+  font-size: 14px;
+}
+
+.health-track {
+  height: 5px;
+}
+
+/* Мобільні екрани */
+@media (max-width: 760px) {
+  .hud-panel {
+    top: 8px;
+    left: 8px;
+    width: min(240px, calc(100vw - 16px));
+  }
+
+  .controls-panel {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    max-width: none;
+  }
+
+  .controls-list {
+    gap: 5px 8px;
+  }
+
+  .health-panel {
+    bottom: 105px;
+  }
+}

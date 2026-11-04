@@ -25,3 +25,15 @@ dist-ssr
 coverage/
 playwright-report/
 test-results/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+server/.env
+
+# Runtime logs and profiling artifacts
+server/logs/
+logs/
+*.cpuprofile
+server-dist/

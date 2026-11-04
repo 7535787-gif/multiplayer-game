@@ -22,6 +22,7 @@ import type { RoomPlayer } from './room.js'
 interface GameWebSocket extends WebSocket {
   protocolFormat?: 'json' | 'binary'
   playerRoomId?: string | null
+  ipAddress?: string
   player?: RoomPlayer
   room?: import('./room.ts').Room
   missedPongs?: number
@@ -53,7 +54,7 @@ function rawDataToBuffer(data: RawData): Buffer {
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const clientDist = path.resolve(__dirname, '../../client/dist')
+const clientDist = process.env.CLIENT_DIST ?? path.resolve(__dirname, '../../client/dist')
 
 const mimeTypes: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -75,7 +76,25 @@ const mimeTypes: Record<string, string> = {
 }
 
 const config = loadConfig()
-const logger = await createLogger(config.logDir)
+const logger = await createLogger(config.logDir, config.logLevel)
+const VERSION = process.env.BUILD_VERSION ?? 'development'
+const GIT_SHA = process.env.GIT_SHA ?? 'unknown'
+let ready = false
+const ipConnections = new Map<string, number>()
+const rejectedConnections = new Map<string, number>()
+let messageCount = 0
+let byteCount = 0
+let messagesPerSecond = 0
+let bytesPerSecond = 0
+let lastTrafficSample = Date.now()
+function reject(reason: string): void { rejectedConnections.set(reason, (rejectedConnections.get(reason) ?? 0) + 1) }
+function clientIp(req: IncomingMessage): string {
+  if (config.trustProxy) {
+    const forwarded = req.headers['x-forwarded-for']
+    if (typeof forwarded === 'string') return forwarded.split(',')[0]?.trim() || 'unknown'
+  }
+  return req.socket.remoteAddress ?? 'unknown'
+}
 const matchLoggers = new Map<string, MatchLogger | Promise<MatchLogger | null>>()
 
 function logEvent(type: string, details: Record<string, unknown> = {}): void {
@@ -109,28 +128,28 @@ const roomDefinitions = [
     id: 'training',
     name: 'Training Room',
     arena: { width: 1000, height: 700 },
-    maxPlayers: 4,
+    maxPlayers: Math.min(4, config.maxPlayersPerRoom),
     persistent: true,
   },
   {
     id: 'deep-space',
     name: 'Deep Space',
     arena: { width: 1200, height: 800 },
-    maxPlayers: 16,
+    maxPlayers: Math.min(16, config.maxPlayersPerRoom),
     persistent: true,
   },
   {
     id: 'asteroid-field',
     name: 'Asteroid Field',
     arena: { width: 800, height: 600 },
-    maxPlayers: 4,
+    maxPlayers: Math.min(4, config.maxPlayersPerRoom),
     persistent: true,
   },
 ]
 
 
 const roomManager = new RoomManager({
-  maxRooms: 20,
+  maxRooms: config.maxRooms,
 
   onRoomCreated(room) {
     const matchLoggerPromise = createMatchLogger(room.id, config.logDir)
@@ -270,8 +289,9 @@ const server = createServer(async (req, res) => {
     const current = nodePerformance.eventLoopUtilization()
     const elu = nodePerformance.eventLoopUtilization(current, eventLoopUtilization)
     eventLoopUtilization = current
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
-    res.end(JSON.stringify({ tickSamples: sorted.length, tickP50Ms: percentile(.50), tickP95Ms: percentile(.95), tickP99Ms: percentile(.99), eventLoopUtilization: elu.utilization, eventLoopDelayP99Ms: Number(eventLoopHistogram.percentile(99) / 1e6), rssBytes: process.memoryUsage().rss }))
+    const players = [...wss.clients].filter((client) => client.readyState === WebSocket.OPEN && client.playerRoomId).length
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+    res.end(JSON.stringify({ version: VERSION, gitSha: GIT_SHA, players, rooms: roomManager.size, messagesPerSecond, bytesPerSecond, tickSamples: sorted.length, tickP50Ms: percentile(.50), tickP95Ms: percentile(.95), tickP99Ms: percentile(.99), eventLoopUtilization: elu.utilization, eventLoopDelayP99Ms: Number(eventLoopHistogram.percentile(99) / 1e6), rssBytes: process.memoryUsage().rss, rejectedConnections: Object.fromEntries(rejectedConnections) }))
     return
   }
 
@@ -297,10 +317,14 @@ const server = createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && pathname === '/health') {
-    res.writeHead(200, {
-      'Content-Type': 'application/json; charset=utf-8',
-    })
-    res.end(JSON.stringify({ status: 'ok' }))
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+    res.end(JSON.stringify({ status: 'ok', version: VERSION, gitSha: GIT_SHA, uptimeSeconds: Math.floor(process.uptime()) }))
+    return
+  }
+
+  if (req.method === 'GET' && pathname === '/ready') {
+    res.writeHead(ready && !shuttingDown ? 200 : 503, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ status: ready && !shuttingDown ? 'ready' : 'not-ready', version: VERSION, gitSha: GIT_SHA }))
     return
   }
 
@@ -419,7 +443,12 @@ const server = createServer(async (req, res) => {
         return
       }
 
-      if (roomManager.size >= 20) {
+      console.log({
+        currentRooms: roomManager.size,
+        maxRooms: config.maxRooms,
+      })
+
+      if (roomManager.size >= config.maxRooms) {
         res.writeHead(409, {
           'Content-Type': 'application/json; charset=utf-8',
         })
@@ -432,7 +461,7 @@ const server = createServer(async (req, res) => {
       if (
         typeof maxPlayers !== 'number' || !Number.isInteger(maxPlayers) ||
         maxPlayers < 2 ||
-        maxPlayers > 128
+        maxPlayers > config.maxPlayersPerRoom
       ) {
         res.writeHead(400, {
           'Content-Type': 'application/json; charset=utf-8',
@@ -563,6 +592,12 @@ function broadcastRoster(roomId: string): void {
 }
 
 server.on('upgrade', (req, socket, head) => {
+  if (shuttingDown) { socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n'); socket.destroy(); return }
+  const origin = req.headers.origin
+  if ((!origin && process.env.NODE_ENV === 'production') || (origin && !config.allowedOrigins.includes(origin))) { reject('origin'); logEvent('connection-rejected', { reason: 'origin', origin }); socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return }
+  const ip = clientIp(req)
+  const currentForIp = ipConnections.get(ip) ?? 0
+  if (currentForIp >= config.maxConnectionsPerIp) { reject('ip-limit'); logEvent('connection-rejected', { reason: 'ip-limit', ip }); socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n'); socket.destroy(); return }
   let pathname: string
   try {
     pathname = new URL(req.url ?? '/', 'http://localhost').pathname
@@ -576,6 +611,8 @@ server.on('upgrade', (req, socket, head) => {
   }
 
   wss.handleUpgrade(req, socket, head, (ws) => {
+    ipConnections.set(ip, currentForIp + 1)
+    ;(ws as GameWebSocket).ipAddress = ip
     const url = new URL(req.url ?? '/', 'http://localhost')
     ws.protocolFormat = url.searchParams.get('protocol') === 'json' ? 'json' : 'binary'
     wss.emit('connection', ws, req)
@@ -583,7 +620,7 @@ server.on('upgrade', (req, socket, head) => {
 })
 
 wss.on('connection', (socketWs) => {
-  const ws = socketWs
+  const ws = socketWs as GameWebSocket
   const player: PlayerConnection & RoomPlayer = {
     id: randomUUID(),
     name: '',
@@ -601,6 +638,7 @@ wss.on('connection', (socketWs) => {
 
   const joinTimer = setTimeout(() => {
     if (!joined) {
+      reject('join-timeout')
       logEvent('join-timeout', { playerId: player.id })
       ws.close(1008, 'Join timeout')
     }
@@ -611,15 +649,19 @@ wss.on('connection', (socketWs) => {
   })
 
   ws.on('message', (raw, isBinary) => {
+    messageCount++
+    byteCount += rawDataToBuffer(raw).byteLength
     if (!messageBucket.consume()) {
-      logEvent('rate-limit', { playerId: player.id })
+      reject('rate-limit')
+      logEvent('rate-limit', { playerId: player.id, roomId: player.roomId })
       ws.close(1008, 'Rate limit exceeded')
       return
     }
 
     const rawBuffer = rawDataToBuffer(raw)
     if (rawBuffer.byteLength > 4096) {
-      logEvent('message-too-large', { playerId: player.id })
+      reject('payload-too-large')
+      logEvent('message-too-large', { playerId: player.id, roomId: player.roomId })
       ws.close(1009, 'Message too large')
       return
     }
@@ -629,7 +671,8 @@ wss.on('connection', (socketWs) => {
     try {
       message = isBinary ? decodePacket(rawBuffer) : JSON.parse(rawBuffer.toString('utf8'))
     } catch {
-      logEvent('invalid-json', { playerId: player.id })
+      reject('invalid-json')
+      logEvent('invalid-json', { playerId: player.id, roomId: player.roomId })
       ws.close(1007, 'Invalid JSON')
       return
     }
@@ -637,6 +680,7 @@ wss.on('connection', (socketWs) => {
     const validation = parseClientMessage(message)
     
     if (!validation.ok) {
+      reject('invalid-protocol')
       const reason = `Invalid message: ${validation.error.issues
         .map((issue) => issue.message)
         .join('; ')}`
@@ -793,6 +837,8 @@ if (clientMessage.type === 'fire') {
 
   ws.on('close', () => {
     clearTimeout(joinTimer)
+    const ip = ws.ipAddress
+    if (ip) { const count = Math.max(0, (ipConnections.get(ip) ?? 1) - 1); if (count === 0) ipConnections.delete(ip); else ipConnections.set(ip, count) }
 
     if (joined) {
       const roomId = player.roomId
@@ -823,6 +869,13 @@ const heartbeat = setInterval(() => {
 
     ws.missedPongs = (ws.missedPongs || 0) + 1
 
+    if (ws.bufferedAmount > 1024 * 1024) {
+      reject('slow-client')
+      logEvent('slow-client-disconnected', { playerId: ws.player?.id, roomId: ws.playerRoomId })
+      ws.close(1008, 'Slow client')
+      return
+    }
+
     if (ws.missedPongs >= 2) {
       logEvent('heartbeat-timeout', {
         playerId: ws.player?.id,
@@ -837,11 +890,14 @@ const heartbeat = setInterval(() => {
 }, 15000)
 
 let shuttingDown = false
+let fatalShutdown = false
 
 async function shutdown() {
   if (shuttingDown) return
   shuttingDown = true
 
+  ready = false
+  logEvent('shutdown-started', { signal: 'SIGTERM' })
   console.log('Завершення сервера...')
   clearInterval(heartbeat)
   clearInterval(rssTimer)
@@ -869,7 +925,10 @@ async function shutdown() {
   }
 
   for (const ws of wss.clients) {
-    ws.close(1001, 'Server shutting down')
+    if (ws.readyState === WebSocket.OPEN) {
+      try { ws.send(JSON.stringify({ type: 'shutdown', message: 'Сервер перезапускається. Поверніться до лобі.' })) } catch { /* socket may already be closing */ }
+      ws.close(1001, 'Server shutting down')
+    }
   }
 
   const forceClose = setTimeout(() => {
@@ -894,10 +953,11 @@ async function shutdown() {
       matchLoggers.clear()
 
       await Promise.allSettled(closeTasks)
+      await logger.flush()
       await logger.close()
 
       console.log('Журнал збережено. Сервер завершено.')
-      process.exitCode = 0
+      process.exitCode = fatalShutdown ? 1 : 0
     } catch (error) {
       console.error('Помилка журналювання:', error)
       process.exitCode = 1
@@ -909,6 +969,16 @@ async function shutdown() {
 
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
+const fatal = (kind: string, error: unknown) => {
+  const details = error instanceof Error ? { message: error.message, stack: error.stack } : { error: String(error) }
+  fatalShutdown = true
+  process.stderr.write(`${JSON.stringify({ time: new Date().toISOString(), level: 'fatal', type: kind, ...details })}\n`)
+  process.exitCode = 1
+  void shutdown().finally(() => { process.exitCode = 1 })
+}
+process.on('uncaughtException', (error) => fatal('uncaught-exception', error))
+process.on('unhandledRejection', (reason) => fatal('unhandled-rejection', reason))
+setTimeout(() => { if (shuttingDown) process.exit(1) }, 9000).unref()
 
 server.on('error', (error) => {
   console.error('Помилка HTTP-сервера:', error)
@@ -967,6 +1037,16 @@ function runSimulation() {
 }
 
 simulationTimer = setTimeout(runSimulation, SIMULATION_STEP_MS)
-server.listen(config.port, () => {
-  console.log(`HTTP server: http://localhost:${config.port}`)
+setInterval(() => {
+  const now = Date.now()
+  const elapsed = Math.max(0.001, (now - lastTrafficSample) / 1000)
+  messagesPerSecond = Number((messageCount / elapsed).toFixed(2))
+  bytesPerSecond = Number((byteCount / elapsed).toFixed(2))
+  messageCount = 0; byteCount = 0; lastTrafficSample = now
+}, 1000).unref()
+
+server.listen(config.port, '0.0.0.0', () => {
+  ready = true
+  logEvent('server-ready', { port: config.port, version: VERSION })
+  console.log(`HTTP server: http://0.0.0.0:${config.port} (${VERSION})`)
 })

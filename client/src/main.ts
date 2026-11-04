@@ -1,3 +1,9 @@
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((error: unknown) => console.warn('PWA service worker registration failed', error))
+  })
+}
+
 import './style.css'
 
 if (typeof window !== 'undefined') Object.assign(window, { __lab7WorkerBenchmark: benchmarkParticleWorker })
@@ -61,6 +67,11 @@ import {
 
 const app = document.querySelector<HTMLElement>('#app')
 if (!app) throw new Error('Не знайдено кореневий елемент #app')
+
+void fetch('/health').then((response) => response.ok ? response.json() as Promise<{ version?: string }> : null).then((health) => {
+  const subtitle = document.querySelector<HTMLElement>('.hud-subtitle')
+  if (subtitle && health?.version) subtitle.append(document.createTextNode(` · BUILD ${health.version}`))
+}).catch(() => undefined)
 
 app.innerHTML = `
   <section class="loading-screen" id="loadingScreen">
@@ -283,7 +294,17 @@ const gameSocket = new GameSocket()
 let reconnectJoinRequired = false
 
 gameSocket.addEventListener('close', () => {
-  if (ownPlayerId && activeRoomId && activePlayerName) reconnectJoinRequired = true
+  if (ownPlayerId && activeRoomId) {
+    reconnectJoinRequired = false
+    ownPlayerId = null
+    activeRoomId = ''
+    gameStarted = false
+    gameUi.hidden = true
+    lobbyUI.show()
+    lobbyUI.setBusy(false)
+    lobbyUI.setStatus('З’єднання із сервером перервано. Повернули вас до лобі; відновіть гру після відновлення сервера.', 'error')
+    void lobby.open()
+  }
 })
 
 gameSocket.addEventListener('open', () => {
@@ -303,6 +324,19 @@ gameSocket.addEventListener('message', (rawEvent) => {
   } catch {
     lobbyUI.setBusy(false)
     lobbyUI.setStatus('Сервер надіслав некоректне повідомлення', 'error')
+    return
+  }
+
+  if (message.type === 'shutdown') {
+    reconnectJoinRequired = false
+    ownPlayerId = null
+    activeRoomId = ''
+    gameStarted = false
+    gameUi.hidden = true
+    lobbyUI.show()
+    lobbyUI.setBusy(false)
+    lobbyUI.setStatus(message.message || 'Сервер перезапускається. Оберіть кімнату в лобі.', 'error')
+    void lobby.open()
     return
   }
 

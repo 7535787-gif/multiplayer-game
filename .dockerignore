@@ -1,0 +1,31 @@
+# Dependencies and generated output
+node_modules
+**/node_modules
+client/dist
+server-dist
+dist
+coverage
+test-results
+playwright-report
+
+# Git and local tooling
+.git
+.github
+.vscode
+.idea
+
+# Runtime data and local secrets
+.env
+.env.*
+!.env.example
+server/.env
+server/logs
+logs
+*.log
+*.cpuprofile
+
+# Local-only artifacts
+screenshots
+benchmark.html
+performance-client.json
+performance-client.png

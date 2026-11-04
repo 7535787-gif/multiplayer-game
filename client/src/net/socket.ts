@@ -25,6 +25,7 @@ export class GameSocket extends EventTarget {
   #retryTimer: ReturnType<typeof setTimeout> | null = null
   #attempt = 0
   #closed = false
+  #serverShuttingDown = false
   #url: string
   #stats: NetworkStats = { sentBytes: 0, receivedBytes: 0, droppedPackets: 0, lastRttMs: null }
   #network = readNetworkOptions()
@@ -47,6 +48,7 @@ export class GameSocket extends EventTarget {
 
   connect() {
     if (this.#closed || this.#socket) return
+    this.#serverShuttingDown = false
 
     const socket = new WebSocket(this.#url)
     socket.binaryType = 'arraybuffer'
@@ -74,6 +76,9 @@ export class GameSocket extends EventTarget {
         const raw: unknown = typeof event.data === 'string' ? JSON.parse(event.data) : decodePacket(event.data)
         measureLab7('lab7:decode', 'lab7:decode:start')
         message = serverMessageSchema.parse(raw)
+        if (message.type === 'shutdown') {
+          this.#serverShuttingDown = true
+        }
       } catch (error) {
         this.dispatchEvent(new CustomEvent('protocol-error', { detail: error }))
         return
@@ -107,9 +112,13 @@ export class GameSocket extends EventTarget {
     socket.addEventListener('close', () => {
       if (this.#socket === socket) this.#socket = null
       this.dispatchEvent(new Event('close'))
-      if (!this.#closed) this.#scheduleReconnect()
+
+      if (!this.#closed && !this.#serverShuttingDown) {
+        this.#scheduleReconnect()
+      }
     })
-  }
+
+    } // закриваємо метод connect()
 
   send(message: ClientMessage): void {
     if (this.#socket?.readyState === WebSocket.OPEN) {

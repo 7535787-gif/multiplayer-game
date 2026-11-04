@@ -158,7 +158,7 @@ function exerciseTwoClients(port) {
 test('WebSocket JSON and binary modes both join, pong, and acknowledge inputs', async (t) => {
   const port = await getFreePort()
   const logDir = await mkdtemp(path.join(tmpdir(), 'multiplayer-game-lab05-'))
-  const child = spawn(process.execPath, ['server/src/index.js'], {
+  const child = spawn(process.execPath, ['server-dist/server/src/index.js'], {
     cwd: root,
     env: { ...process.env, PORT: String(port), LOG_DIR: logDir },
     stdio: ['ignore', 'pipe', 'pipe'],

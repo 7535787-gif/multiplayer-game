@@ -57,10 +57,10 @@ app.innerHTML = `
         <div class="hud-logo">✦</div>
 
         <div>
-          <h1 class="hud-title">ПОВІТРЯНИЙ БІЙ // СИМУЛЯЦІЯ</h1>
+          <h1 class="hud-title">ПОВІТРЯНИЙ БІЙ</h1>
           <p class="hud-subtitle">
             <span class="status-indicator"></span>
-            SYSTEM ONLINE · TRAINING MODE
+            ONLINE · TRAINING
           </p>
         </div>
       </header>
@@ -71,46 +71,14 @@ app.innerHTML = `
           <strong class="metric-value" id="score">0</strong>
         </div>
 
-        <div class="metric">
-          <span class="metric-label">КРОКИ</span>
-          <strong class="metric-value" id="steps">0</strong>
-        </div>
-
         <div class="metric metric--cyan">
-          <span class="metric-label">STEPS / S</span>
-          <strong class="metric-value" id="stepsPerSecond">0</strong>
-        </div>
-
-        <div class="metric metric--cyan">
-          <span class="metric-label">FRAMES / S</span>
+          <span class="metric-label">FPS</span>
           <strong class="metric-value" id="framesPerSecond">0</strong>
-        </div>
-
-        <div class="metric">
-          <span class="metric-label">FRAME TIME</span>
-          <strong class="metric-value">
-            <span id="frameTime">0</span> ms
-          </strong>
         </div>
 
         <div class="metric">
           <span class="metric-label">ШВИДКІСТЬ</span>
           <strong class="metric-value" id="speed">0</strong>
-        </div>
-
-        <div class="metric">
-          <span class="metric-label">POSITION X</span>
-          <strong class="metric-value" id="x">0</strong>
-        </div>
-
-        <div class="metric">
-          <span class="metric-label">POSITION Y</span>
-          <strong class="metric-value" id="y">0</strong>
-        </div>
-
-        <div class="metric">
-          <span class="metric-label">КУТ</span>
-          <strong class="metric-value" id="angle">0</strong>
         </div>
       </div>
     </section>
@@ -143,7 +111,7 @@ app.innerHTML = `
     </section>
 
     <section class="controls-panel">
-      <h2 class="controls-title">FLIGHT CONTROLS / КЕРУВАННЯ</h2>
+      <h2 class="controls-title">КЕРУВАННЯ <span class="debug-hint">F3 — статистика</span></h2>
 
       <ul class="controls-list">
         <li class="control-item">
@@ -156,7 +124,7 @@ app.innerHTML = `
           <kbd>←</kbd><kbd>→</kbd><span>Поворот</span>
         </li>
         <li class="control-item">
-          <kbd>Space</kbd><span>Постріл</span>
+          <kbd>Space</kbd><span>Звичайний постріл</span>
         </li>
         <li class="control-item">
           <kbd>H</kbd><span>Самонавідна ракета</span>
@@ -213,9 +181,15 @@ let destroyAudioPlayer = null
 
 let respawnTimer = 0
 let asteroidSpawnTimer = 0
+function setTextContent(selector, value) {
+  const element = document.querySelector(selector)
+  if (element) element.textContent = String(value)
+}
+
 let pickupSpawnTimer = 0
 
 let gameStarted = false
+let debugVisible = false
 
 let activeArena = {
   width: 1000,
@@ -818,6 +792,13 @@ function update(dt) {
 
 
 function handleKeyDown(event) {
+  if (event.code === 'F3' && !event.repeat) {
+    event.preventDefault()
+    debugVisible = !debugVisible
+    document.querySelector('#netgraph')?.classList.toggle('is-visible', debugVisible)
+    return
+  }
+
   if (!gameStarted || !ship?.alive || event.repeat) {
     return
   }
@@ -980,16 +961,14 @@ function render({
 
   // Статистика HUD.
   document.querySelector('#score').textContent = world.score
-  document.querySelector('#steps').textContent = totalSteps
-  document.querySelector('#stepsPerSecond').textContent =
-    stepsPerSecond.toFixed(1)
+  setTextContent('#steps', totalSteps)
+  setTextContent('#stepsPerSecond', stepsPerSecond.toFixed(1))
   document.querySelector('#framesPerSecond').textContent =
     framesPerSecond.toFixed(1)
-  document.querySelector('#frameTime').textContent =
-    frameTime.toFixed(2)
-  document.querySelector('#x').textContent = ship.pos.x.toFixed(2)
-  document.querySelector('#y').textContent = ship.pos.y.toFixed(2)
-  document.querySelector('#angle').textContent = ship.angle.toFixed(2)
+  setTextContent('#frameTime', frameTime.toFixed(2))
+  setTextContent('#x', ship.pos.x.toFixed(2))
+  setTextContent('#y', ship.pos.y.toFixed(2))
+  setTextContent('#angle', ship.angle.toFixed(2))
   document.querySelector('#speed').textContent =
     ship.vel.length().toFixed(1)
 
@@ -1006,6 +985,7 @@ function render({
       maxWidth: 'min(780px, calc(100vw - 24px))',
     })
     document.body.appendChild(netgraph)
+    netgraph.classList.toggle('is-visible', debugVisible)
   }
 
   const now = performance.now()

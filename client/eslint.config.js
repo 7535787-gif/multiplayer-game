@@ -35,6 +35,7 @@ export default [
         EventTarget: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",
+        clearTimeout: "readonly",
         setInterval: "readonly",
         clearInterval: "readonly",
         AbortController: "readonly",
@@ -69,6 +70,21 @@ export default [
       "@typescript-eslint/no-unused-vars": "off",
       "no-unused-vars": "off",
       "@typescript-eslint/no-empty-object-type": "off",
+    },
+  },
+
+  {
+    files: ["tests/integration/**/*.mjs"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: {
+        console: "readonly",
+        fetch: "readonly",
+        process: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+      },
     },
   },
 

@@ -56,6 +56,10 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('player-left'),
     playerId: z.string(),
   }).strict(),
+  z.object({
+    type: z.literal('shutdown'),
+    message: z.string(),
+  }).strict(),
 ])
 
 export type ServerMessage = z.infer<typeof serverMessageSchema>

@@ -1,8 +1,11 @@
-name: Lab 7 quality gate
+name: Lab 8 quality gate
 
 on:
   push:
   pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   quality:
@@ -13,11 +16,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # npm install refreshes the lockfile after adding the Lab 7 test tools.
-      - run: npm install
+      - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      - run: npm run test:integration
       - run: npm run build
       - run: npm run test:e2e
