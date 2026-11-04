@@ -20,7 +20,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:shared": "vitest run shared",
-    "test:integration": "npm run build:server && node --test --test-concurrency=1 tests/integration/*.mjs",
+    "test:integration": "node scripts/run-integration.mjs",
     "test:client": "vitest run client/src",
     "test:server": "vitest run server/src",
     "loadtest": "node scripts/load-test.mjs",
