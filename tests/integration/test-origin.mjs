@@ -2,7 +2,9 @@
 import assert from "node:assert/strict";
 import WebSocket from "ws";
 
-const URL = "ws://localhost:3000/ws?protocol=json";
+const port = process.env.TEST_PORT ?? "3000";
+const URL = `ws://127.0.0.1:${port}/ws?protocol=json`;
+const allowedOrigin = `http://localhost:${port}`;
 
 function connect(origin) {
   return new Promise((resolve, reject) => {
@@ -32,6 +34,6 @@ function connect(origin) {
 }
 
 test("Origin validation", async () => {
-  assert.equal(await connect("http://localhost:3000"), "accepted");
+  assert.equal(await connect(allowedOrigin), "accepted");
   assert.equal(await connect("http://evil.example"), 403);
 });

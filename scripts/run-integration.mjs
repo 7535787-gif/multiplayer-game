@@ -68,8 +68,8 @@ async function waitForHealth(child) {
 }
 
 try {
-  console.log("Building server...");
-  const build = spawn("npm", ["run", "build:server"], {
+  console.log("Building server and client...");
+  const build = spawn("npm", ["run", "build"], {
     cwd: root,
     stdio: "inherit",
     shell: process.platform === "win32",
@@ -105,7 +105,15 @@ try {
   testProcess = spawn(
     process.execPath,
     ["--test", "--test-concurrency=1", ...files],
-    { cwd: root, stdio: "inherit" },
+    {
+      cwd: root,
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        PORT: String(port),
+        TEST_PORT: String(port),
+      },
+    },
   );
 
   await new Promise((resolve, reject) => {

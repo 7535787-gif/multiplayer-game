@@ -2,11 +2,12 @@
 import assert from "node:assert/strict";
 import WebSocket from "ws";
 
+const port = process.env.TEST_PORT ?? "3000";
+const wsUrl = `ws://127.0.0.1:${port}/ws?protocol=json`;
+const origin = `http://localhost:${port}`;
+
 test("Oversized payload is rejected", async () => {
-  const ws = new WebSocket(
-    "ws://localhost:3000/ws?protocol=json",
-    { origin: "http://localhost:3000" }
-  );
+  const ws = new WebSocket(wsUrl, { origin });
 
   const result = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
