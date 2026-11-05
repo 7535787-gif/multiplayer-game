@@ -1,4 +1,5 @@
-﻿import { spawn } from "node:child_process";
+import { spawn } from "node:child_process";
+import { createServer as createNetServer } from "node:net";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -6,8 +7,26 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverEntry = path.join(root, "server-dist", "server", "src", "index.js");
-const port = 3000;
+async function getFreePort() {
+  const netServer = createNetServer();
+  await new Promise((resolve, reject) => {
+    netServer.once("error", reject);
+    netServer.listen(0, "127.0.0.1", resolve);
+  });
+  const address = netServer.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Could not determine an available TCP port");
+  }
+  const { port } = address;
+  await new Promise((resolve, reject) =>
+    netServer.close((error) => error ? reject(error) : resolve())
+  );
+  return port;
+}
+
+const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
+const allowedOrigin = baseUrl;
 const logDir = await mkdtemp(path.join(os.tmpdir(), "multiplayer-integration-"));
 
 let server;
@@ -69,7 +88,8 @@ try {
       ...process.env,
       PORT: String(port),
       LOG_DIR: logDir,
-      ALLOWED_ORIGINS: `http://localhost:${port},http://127.0.0.1:${port}`,
+      ALLOWED_ORIGINS: `${allowedOrigin},http://localhost:${port}`,
+      TEST_PORT: String(port),
     },
     stdio: ["ignore", "inherit", "inherit"],
   });

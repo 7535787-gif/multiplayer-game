@@ -11,7 +11,7 @@ import { createLogger } from './logger.ts'
 import { createMatchLogger } from './match-logger.ts'
 import { createTokenBucket } from './rate-limiter.ts'
 import { parseClientMessage } from '../../shared/protocol.ts'
-import { createReadStream } from 'node:fs'
+import { createReadStream, existsSync } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { performance as nodePerformance, monitorEventLoopDelay } from 'node:perf_hooks'
 import { addBots, tickBots } from './bots.ts'
@@ -54,7 +54,17 @@ function rawDataToBuffer(data: RawData): Buffer {
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const clientDist = process.env.CLIENT_DIST ?? path.resolve(__dirname, '../../client/dist')
+const clientDistCandidates = [
+  process.env.CLIENT_DIST,
+  path.resolve(__dirname, '../../client/dist'),
+  path.resolve(__dirname, '../../../client/dist'),
+  path.resolve(process.cwd(), 'client/dist'),
+].filter((candidate): candidate is string => Boolean(candidate))
+
+const clientDist =
+  clientDistCandidates.find((candidate) =>
+    existsSync(path.join(candidate, 'index.html')),
+  ) ?? path.resolve(process.cwd(), 'client/dist')
 
 const mimeTypes: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
