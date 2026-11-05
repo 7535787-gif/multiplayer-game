@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { URL } from "node:url";
 
 const port = process.env.TEST_PORT ?? "3000";
 const baseUrl = `http://127.0.0.1:${port}`;
