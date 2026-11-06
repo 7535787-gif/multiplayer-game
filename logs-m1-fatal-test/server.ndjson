@@ -1,0 +1,2 @@
+{"level":30,"time":"2026-11-05T02:23:39.942Z","service":"multiplayer-game","port":3004,"version":"m1-fatal-test","type":"server-ready"}
+{"level":30,"time":"2026-11-05T02:23:41.337Z","service":"multiplayer-game","signal":"SIGTERM","type":"shutdown-started"}

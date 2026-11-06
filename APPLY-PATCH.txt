@@ -1,0 +1,25 @@
+LAB 08 PATCH — README IS INTENTIONALLY NOT INCLUDED
+
+Apply the files in this archive over the matching paths in your existing repository.
+Do not replace README.md; README work is intentionally postponed until the technical work is complete.
+Do not copy node_modules, server/.env, .git, or generated build output from the original project archive.
+
+Changes in this patch:
+- Main Dockerfile now uses multi-stage build + Distroless Node.js 22, non-root UID 65532, exec-form CMD, HEALTHCHECK, production-only dependencies and runtime-file pruning.
+- Compose healthcheck uses the Distroless Node executable path.
+- Build version (release tag) and commit SHA are both embedded and returned by /health, /ready and /metrics.
+- Client entrypoint now loads main.ts, where service-worker registration exists; before this change index.html loaded main.js and PWA registration was not executed.
+- `npm test` builds the server first; the WebSocket smoke test then starts the same compiled server artifact used by production.
+- Slow-client heartbeat loop continues checking other clients after closing a slow client.
+- Release workflow requires DEPLOY_WEBHOOK_URL; it must be configured after choosing the hosting platform.
+- .gitignore now excludes local environment files and runtime artifacts.
+
+After applying:
+1. Remove the old experimental Dockerfile.distroless (the main Dockerfile now contains the Distroless build).
+2. Because server/.env was tracked by Git, run `git rm --cached -- server/.env` from the repository root. This keeps your local file if it exists but removes it from the next commit. Ensure it is not re-added.
+3. If server/.env ever contained real credentials, rotate them; removing the file does not erase Git history.
+4. Run `npm ci`, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`.
+5. Build and measure the Docker image. The optimized production-dependency pruning is intended to get below 200 MiB, but the final size must be verified on your Docker Desktop; Docker was not available in the patch-preparation environment.
+6. Configure the hosting provider and GitHub secret DEPLOY_WEBHOOK_URL before pushing a v* tag.
+
+The README is deliberately not modified.

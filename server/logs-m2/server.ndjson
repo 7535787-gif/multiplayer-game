@@ -1,0 +1,6 @@
+{"level":30,"time":"2026-11-05T02:40:18.442Z","service":"multiplayer-game","port":3000,"version":"m2-check","type":"server-ready"}
+{"level":30,"time":"2026-11-05T02:44:51.019Z","service":"multiplayer-game","signal":"SIGTERM","type":"shutdown-started"}
+{"level":30,"time":"2026-11-05T02:44:53.863Z","service":"multiplayer-game","port":3000,"version":"m2-check","type":"server-ready"}
+{"level":30,"time":"2026-11-05T02:45:07.790Z","service":"multiplayer-game","signal":"SIGTERM","type":"shutdown-started"}
+{"level":30,"time":"2026-11-05T02:45:21.005Z","service":"multiplayer-game","port":3000,"version":"m2-check","type":"server-ready"}
+{"level":30,"time":"2026-11-05T02:46:25.519Z","service":"multiplayer-game","signal":"SIGTERM","type":"shutdown-started"}

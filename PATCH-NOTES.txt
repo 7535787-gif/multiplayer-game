@@ -1,0 +1,11 @@
+# Lab 8 patch contents
+
+These files add the missing Docker/Compose setup and align CI with npm ci.
+The root package.json also adds the build:server alias expected by the release workflow.
+
+Important: this patch does NOT claim that the full Lab 8 is complete.
+The existing project logger is a custom JSON logger, not Pino. Pino integration
+and lockfile update remain a separate change. Staging load/chaos tests, Docker
+image size, docker stop/SIGTERM verification, public deployment/WSS, remote RTT,
+uptime monitoring, phone PWA install, demo recording, README rewrite and tags
+must be completed and evidenced separately.
