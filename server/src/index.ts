@@ -883,7 +883,7 @@ const heartbeat = setInterval(() => {
       reject('slow-client')
       logEvent('slow-client-disconnected', { playerId: ws.player?.id, roomId: ws.playerRoomId })
       ws.close(1008, 'Slow client')
-      return
+      continue
     }
 
     if (ws.missedPongs >= 2) {

@@ -34,7 +34,9 @@ async function runLevel(count) {
       roomIds.push(payload.room.id)
     }
     for (let i = 0; i < count; i++) {
-      const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/ws?protocol=json`)
+      const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/ws?protocol=json`, {
+        headers: { Origin: base }
+      })
       sockets.push(ws)
       await new Promise((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject) })
       ws.on('message', (data) => { bytesIn += data.length; snapshots++ })

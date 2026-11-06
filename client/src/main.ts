@@ -16,8 +16,8 @@ import { integrateShip, FIXED_DT } from '../../shared/ship-sim.js'
 import { reconcileShipState } from '../../shared/reconciliation.js'
 import { interpolateRemotePlayer } from '../../shared/interpolation.js'
 
-import { loadJson, loadAll, AssetManifestSchema } from './assets/loader.js'
-import type { LoadedAssets, LoadProgress, AssetManifest } from './assets/loader.js'
+import { loadJson, loadAll, AssetManifestSchema } from './assets/loader.ts'
+import type { LoadedAssets, LoadProgress, AssetManifest } from './assets/loader.ts'
 import type { Room } from './lobby.js'
 import type { Seq } from '../../shared/types.js'
 import type { ShipInput } from '../../shared/types.js'
@@ -891,6 +891,13 @@ function update(dt: number): void {
 
 function handleKeyDown(event: KeyboardEvent): void {
   if (!gameStarted || !ship?.alive || event.repeat) {
+    return
+  }
+
+  if (event.code === 'KeyN') {
+    event.preventDefault()
+    document.querySelector<HTMLElement>('#netgraph')
+      ?.classList.toggle('is-visible')
     return
   }
 
