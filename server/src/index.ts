@@ -326,9 +326,23 @@ const server = createServer(async (req, res) => {
     return
   }
 
-  if (req.method === 'GET' && pathname === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
-    res.end(JSON.stringify({ status: 'ok', version: VERSION, gitSha: GIT_SHA, uptimeSeconds: Math.floor(process.uptime()) }))
+  if ((req.method === 'GET' || req.method === 'HEAD') && pathname === '/health') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+    })
+  
+    if (req.method === 'HEAD') {
+      res.end()
+    } else {
+      res.end(JSON.stringify({
+        status: 'ok',
+        version: VERSION,
+        gitSha: GIT_SHA,
+        uptimeSeconds: Math.floor(process.uptime()),
+      }))
+    }
+  
     return
   }
 
